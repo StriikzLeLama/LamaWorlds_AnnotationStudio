@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lama Worlds Annotation Studio</title>
+</head>
+
+<body>
+  <div id="root" style="color: white; padding: 20px; font-family: sans-serif;">Initializing UI...</div>
+  <div id="error-display" style="color: #ff4444; padding: 20px; font-family: monospace; white-space: pre-wrap;"></div>
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      document.getElementById('error-display').innerHTML += `Error: ${message}\nSource: ${source}:${lineno}\n\n`;
+    };
+    window.onunhandledrejection = function (event) {
+      document.getElementById('error-display').innerHTML += `Promise Rejection: ${event.reason}\n\n`;
+    };
+  </script>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

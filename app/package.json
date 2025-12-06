@@ -1,0 +1,89 @@
+{
+    "name": "lama-worlds-annotation-studio",
+    "version": "1.0.0",
+    "description": "Lama Worlds Annotation Studio - Local YOLO Annotator",
+    "main": "electron/main.js",
+    "scripts": {
+        "dev": "node scripts/dev-runner.js",
+        "build": "vite build",
+        "preview": "vite preview",
+        "electron": "electron .",
+        "start": "npm run dev",
+        "build:app": "npm run build && node build-config.js && electron-builder",
+        "build:win": "npm run build && node build-config.js && electron-builder --win",
+        "dist": "electron-builder",
+        "postinstall": "electron-builder install-app-deps"
+    },
+    "keywords": [
+        "annotation",
+        "yolo",
+        "electron",
+        "react",
+        "fastapi"
+    ],
+    "author": "Antigravity",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "electron": "^28.0.0",
+        "electron-builder": "^24.9.1",
+        "vite": "^5.0.0",
+        "@vitejs/plugin-react": "^4.2.0"
+    },
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "axios": "^1.6.2",
+        "lucide-react": "^0.294.0",
+        "framer-motion": "^10.16.5",
+        "konva": "^9.3.0",
+        "react-konva": "^18.2.10",
+        "use-image": "^1.1.1",
+        "uuid": "^9.0.1"
+    },
+    "build": {
+        "appId": "com.lamaworlds.annotator",
+        "productName": "Lama Worlds Annotation Studio",
+        "files": [
+            "dist/**/*",
+            "electron/**/*",
+            "package.json",
+            "requirements.txt",
+            "!backend/__pycache__/**/*",
+            "!backend/**/*.pyc",
+            "!node_modules/**/*",
+            "!react/**/*",
+            "!scripts/**/*",
+            "!vite.config.js"
+        ],
+        "extraFiles": [
+            {
+                "from": "backend",
+                "to": "resources/backend",
+                "filter": ["**/*", "!__pycache__/**/*", "!**/*.pyc"]
+            }
+        ],
+        "directories": {
+            "output": "release",
+            "buildResources": "resources"
+        },
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": ["x64"]
+                }
+            ],
+            "artifactName": "${productName}-${version}-Setup.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Lama Annotation Studio",
+            "include": "resources/installer.nsh"
+        },
+        "compression": "maximum"
+    }
+}

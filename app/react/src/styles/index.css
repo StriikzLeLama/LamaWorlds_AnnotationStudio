@@ -1,0 +1,105 @@
+:root {
+  --bg-dark: #050510;
+  --bg-panel: rgba(20, 20, 35, 0.7);
+  --neon-blue: #00e0ff;
+  --neon-cyan: #56b0ff;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --glass-border: 1px solid rgba(0, 224, 255, 0.2);
+  --glass-shadow: 0 0 15px rgba(0, 224, 255, 0.1);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  /* App feel */
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan);
+}
+
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(10px);
+  border: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 12px;
+}
+
+.neon-text {
+  color: var(--neon-blue);
+  text-shadow: 0 0 5px var(--neon-blue);
+}
+
+.btn-primary {
+  background: rgba(0, 224, 255, 0.1);
+  border: 1px solid var(--neon-blue);
+  color: var(--neon-blue);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-primary:hover {
+  background: var(--neon-blue);
+  color: #000;
+  box-shadow: 0 0 20px var(--neon-blue);
+}
+
+.btn-danger {
+  border: 1px solid #ff4444;
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.btn-danger:hover {
+  background: #ff4444;
+  color: white;
+  box-shadow: 0 0 15px #ff4444;
+}
+
+input[type="text"] {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #333;
+  color: white;
+  padding: 8px;
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: var(--neon-blue);
+}
+
+.title-drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+button,
+.clickable {
+  -webkit-app-region: no-drag;
+}
