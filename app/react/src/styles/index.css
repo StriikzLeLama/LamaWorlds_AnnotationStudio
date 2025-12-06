@@ -9,14 +9,27 @@
   --glass-shadow: 0 0 15px rgba(0, 224, 255, 0.1);
 }
 
-body {
+html, body {
   margin: 0;
   padding: 0;
   background-color: var(--bg-dark);
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   overflow: hidden;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   /* App feel */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* Scrollbar */

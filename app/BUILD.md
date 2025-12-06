@@ -80,3 +80,33 @@ release/
 ### Build trop volumineux
 → Normal, Electron inclut Chromium (~100-200 MB)
 
+### Erreur réseau lors de l'ouverture de fichier ou import YAML
+
+Si vous obtenez une erreur réseau ("Network Error" ou "ECONNREFUSED") dans l'application compilée :
+
+1. **Vérifiez que Python est installé** :
+   - Python 3.7+ doit être installé et accessible dans votre PATH
+   - Téléchargez depuis : https://www.python.org/downloads/
+   - Lors de l'installation, cochez "Add Python to PATH"
+
+2. **Installez les dépendances Python** :
+   ```bash
+   pip install -r requirements.txt
+   ```
+   Ou si vous avez l'app compilée, naviguez vers `resources/backend` et exécutez :
+   ```bash
+   pip install fastapi uvicorn pillow numpy opencv-python python-multipart watchdog pyyaml
+   ```
+
+3. **Vérifiez les logs du backend** :
+   - La console de l'application devrait afficher les messages de démarrage du backend
+   - Si vous voyez des erreurs sur des modules manquants, installez-les avec pip
+
+4. **Vérifiez que le backend démarre** :
+   - Le backend devrait démarrer automatiquement au lancement de l'application
+   - Vérifiez la console pour le message "Backend is ready!"
+
+5. **Vérifiez le port 8000** :
+   - Le backend utilise le port 8000 par défaut
+   - Assurez-vous qu'aucune autre application n'utilise ce port
+

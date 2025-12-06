@@ -10,7 +10,28 @@ import './styles/index.css';
 
 // Configure Axios
 const API_URL = 'http://localhost:8000';
-const api = axios.create({ baseURL: API_URL });
+const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+
+// Add request interceptor for better error handling
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+            console.error('Backend connection error:', error);
+            // Show user-friendly error
+            if (error.config && !error.config._retry) {
+                error.config._retry = true;
+                // Try to reconnect after a delay
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve(api.request(error.config));
+                    }, 2000);
+                });
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 function App() {
     const [datasetPath, setDatasetPath] = useState('');
@@ -106,6 +127,14 @@ function App() {
         return () => clearTimeout(timer);
     }, []); // Only run on mount
 
+    // Listen for backend errors from Electron
+    useEffect(() => {
+        if (window.electronAPI) {
+            // Note: This requires adding an IPC listener in preload.js
+            // For now, we'll handle network errors via Axios interceptor
+        }
+    }, []);
+
     // Save state whenever relevant values change
     useEffect(() => {
         if (datasetPath) {
@@ -183,6 +212,35 @@ function App() {
         }
     }, [copiedAnnotation, annotations, saveAnnotations]);
 
+    // Save annotations before changing image
+    const saveCurrentAnnotations = useCallback(async () => {
+        if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath && annotations.length >= 0) {
+            try {
+                await api.post('/save_annotation', {
+                    image_name: images[currentImageIndex],
+                    dataset_path: datasetPath,
+                    boxes: annotations
+                });
+                // Update cache
+                annotationCache.current[images[currentImageIndex]] = annotations;
+            } catch (err) {
+                console.error("Failed to save annotations before image change:", err);
+            }
+        }
+    }, [currentImageIndex, images, datasetPath, annotations]);
+
+    // Change image with auto-save
+    const changeImageIndex = useCallback(async (newIndex) => {
+        if (newIndex === currentImageIndex) return;
+        
+        // Save current annotations before changing
+        if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath) {
+            await saveCurrentAnnotations();
+        }
+        
+        setCurrentImageIndex(newIndex);
+    }, [currentImageIndex, images, datasetPath, saveCurrentAnnotations]);
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -223,13 +281,13 @@ function App() {
             if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
                 if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
                     if (currentImageIndex < images.length - 1) {
-                        setCurrentImageIndex(currentImageIndex + 1);
+                        changeImageIndex(currentImageIndex + 1);
                         e.preventDefault();
                     }
                 }
                 if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
                     if (currentImageIndex > 0) {
-                        setCurrentImageIndex(currentImageIndex - 1);
+                        changeImageIndex(currentImageIndex - 1);
                         e.preventDefault();
                     }
                 }
@@ -238,7 +296,7 @@ function App() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedAnnotationId, selectedAnnotationIds, annotations, currentImageIndex, images, saveAnnotations, handleUndo, handleRedo, copyAnnotation, pasteAnnotation, copiedAnnotation]);
+    }, [selectedAnnotationId, selectedAnnotationIds, annotations, currentImageIndex, images, saveAnnotations, handleUndo, handleRedo, copyAnnotation, pasteAnnotation, copiedAnnotation, changeImageIndex]);
 
     // Load annotations when image changes (with caching)
     useEffect(() => {
@@ -373,7 +431,14 @@ function App() {
             }
         } catch (err) {
             console.error(err);
-            const errorMsg = err.response?.data?.detail || err.message || "Failed to import YAML";
+            let errorMsg = "Failed to import YAML";
+            if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+                errorMsg = "Cannot connect to backend server. Please make sure the application is running correctly.";
+            } else if (err.response?.data?.detail) {
+                errorMsg = err.response.data.detail;
+            } else if (err.message) {
+                errorMsg = err.message;
+            }
             alert(`Error importing YAML: ${errorMsg}`);
         } finally {
             setLoading(false);
@@ -420,7 +485,14 @@ function App() {
                     }
                 } catch (err) {
                     console.error(err);
-                    const errorMsg = err.response?.data?.detail || err.message || "Failed to load dataset";
+                    let errorMsg = "Failed to load dataset";
+                    if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+                        errorMsg = "Cannot connect to backend server. Please make sure the application is running correctly.";
+                    } else if (err.response?.data?.detail) {
+                        errorMsg = err.response.data.detail;
+                    } else if (err.message) {
+                        errorMsg = err.message;
+                    }
                     alert(`Error: ${errorMsg}`);
                 } finally {
                     setLoading(false);
@@ -437,12 +509,12 @@ function App() {
     // Calculate progress
     const annotatedCount = images.filter((img, idx) => {
         // Simplified - would need backend to check all images
-        return idx === currentIndex ? annotations.length > 0 : false;
+        return idx === currentImageIndex ? annotations.length > 0 : false;
     }).length;
     const progress = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
 
     return (
-        <div className="app-container" style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#050510', color: 'white' }}>
+        <div className="app-container" style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#050510', color: 'white', overflow: 'hidden', boxSizing: 'border-box' }}>
             {/* Sidebar - Class Manager */}
             <Sidebar
                 classes={classes}
@@ -460,7 +532,7 @@ function App() {
             {/* Main Canvas Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 {/* Top Bar */}
-                <div className="glass-panel title-drag-region" style={{ height: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column' }}>
+                <div className="glass-panel title-drag-region" style={{ height: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column', zIndex: 1000, position: 'relative', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                             <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LAMA ANNOTATION STUDIO</div>
@@ -567,7 +639,7 @@ function App() {
             <RightPanel
                 images={images}
                 currentIndex={currentImageIndex}
-                setIndex={setCurrentImageIndex}
+                setIndex={changeImageIndex}
                 annotations={annotations}
                 classes={classes}
                 selectedAnnotationId={selectedAnnotationId}

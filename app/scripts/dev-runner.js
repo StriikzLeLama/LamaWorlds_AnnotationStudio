@@ -60,6 +60,28 @@ const waitForPort = async (port, name, maxAttempts = 60) => {
     return false;
 };
 
+// Find the actual port Vite is running on
+const findVitePort = async (startPort = 5173, maxPort = 5180) => {
+    for (let port = startPort; port <= maxPort; port++) {
+        if (await checkPort(port)) {
+            // Try to verify it's Vite by checking the response
+            try {
+                const response = await new Promise((resolve, reject) => {
+                    http.get(`http://127.0.0.1:${port}`, (res) => {
+                        resolve(res.statusCode);
+                    }).on('error', reject);
+                });
+                if (response === 200) {
+                    return port;
+                }
+            } catch (e) {
+                // Continue checking
+            }
+        }
+    }
+    return null;
+};
+
 // Start Processes
 (async () => {
     // Verify backend directory exists
@@ -134,7 +156,33 @@ const waitForPort = async (port, name, maxAttempts = 60) => {
         process.exit(1);
     });
 
-    if (!(await waitForPort(VITE_PORT, 'Frontend'))) {
+    // Wait for Vite to start and find the actual port
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Give Vite time to start
+    
+    let actualVitePort = VITE_PORT;
+    const foundPort = await findVitePort(VITE_PORT, 5180);
+    if (foundPort) {
+        actualVitePort = foundPort;
+        if (foundPort !== VITE_PORT) {
+            log('Frontend', `Vite is running on port ${foundPort} (${VITE_PORT} was in use)`, colors.fgYellow);
+        }
+    } else {
+        // Fallback: try to wait for the default port
+        if (!(await waitForPort(VITE_PORT, 'Frontend'))) {
+            log('Frontend', 'Could not detect Vite port, trying alternative ports...', colors.fgYellow);
+            // Try alternative ports
+            for (let port = 5174; port <= 5180; port++) {
+                if (await checkPort(port)) {
+                    actualVitePort = port;
+                    log('Frontend', `Found Vite on port ${port}`, colors.fgGreen);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!actualVitePort) {
+        log('Frontend', 'Failed to find Vite server', colors.fgRed);
         backend.kill();
         vite.kill();
         process.exit(1);
@@ -142,9 +190,10 @@ const waitForPort = async (port, name, maxAttempts = 60) => {
 
     // 3. Start Electron
     log('Electron', 'Launching Application...', colors.fgCyan);
+    log('Electron', `Connecting to Vite on port ${actualVitePort}`, colors.fgYellow);
     const electron = spawn(npxCmd, ['electron', '.'], {
         cwd: ROOT_DIR,
-        env: { ...process.env, ELECTRON_START_URL: `http://127.0.0.1:${VITE_PORT}` },
+        env: { ...process.env, ELECTRON_START_URL: `http://127.0.0.1:${actualVitePort}` },
         stdio: 'inherit',
         shell: true
     });
