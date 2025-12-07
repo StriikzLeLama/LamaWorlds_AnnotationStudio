@@ -4,6 +4,7 @@
     "description": "Lama Worlds Annotation Studio - Local YOLO Annotator",
     "main": "electron/main.js",
     "scripts": {
+    "test-python": "node test-python.js",
         "dev": "node scripts/dev-runner.js",
         "build": "vite build",
         "preview": "vite preview",
@@ -69,6 +70,25 @@
             {
                 "from": "assets/Logo/LamaWorlds_LogoV3.jpg",
                 "to": "assets/Logo/LamaWorlds_LogoV3.jpg"
+            },
+            {
+                "from": "install-backend-deps.bat",
+                "to": "install-backend-deps.bat"
+            },
+            {
+                "from": "install-backend-deps.ps1",
+                "to": "install-backend-deps.ps1"
+            }
+        ],
+        "extraResources": [
+            {
+                "from": "backend",
+                "to": "backend",
+                "filter": ["**/*", "!__pycache__/**/*", "!**/*.pyc"]
+            },
+            {
+                "from": "requirements.txt",
+                "to": "requirements.txt"
             }
         ],
         "directories": {
@@ -83,7 +103,8 @@
                 }
             ],
             "artifactName": "${productName}-${version}-Setup.${ext}",
-            "icon": "resources/icon.jpg"
+            "icon": "resources/icon.jpg",
+            "signAndEditExecutable": false
         },
         "nsis": {
             "oneClick": false,

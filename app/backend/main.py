@@ -25,7 +25,12 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "app": "Lama Worlds Annotation Studio"}
+    return {
+        "status": "ok", 
+        "app": "Lama Worlds Annotation Studio",
+        "version": "1.0.0",
+        "python_version": __import__('sys').version
+    }
 
 @app.post("/load_dataset")
 def load_dataset(data: DatasetPath):

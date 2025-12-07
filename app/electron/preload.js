@@ -6,5 +6,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
     onBackendError: (callback) => {
         ipcRenderer.on('backend-error', (event, error) => callback(error));
+        // Return cleanup function
+        return () => ipcRenderer.removeAllListeners('backend-error');
+    },
+    onBackendReady: (callback) => {
+        ipcRenderer.on('backend-ready', () => callback());
+        // Return cleanup function
+        return () => ipcRenderer.removeAllListeners('backend-ready');
     }
 });

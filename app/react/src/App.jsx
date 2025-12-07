@@ -141,15 +141,28 @@ function App() {
         return () => clearTimeout(timer);
     }, []); // Only run on mount
 
-    // Listen for backend errors from Electron
+    // Listen for backend errors and ready status from Electron
     useEffect(() => {
         // Listen for backend errors from main process
         if (window.electronAPI && window.electronAPI.onBackendError) {
-            const cleanup = window.electronAPI.onBackendError((error) => {
+            const cleanupError = window.electronAPI.onBackendError((error) => {
                 console.error('Backend error received:', error);
                 setBackendError(error);
             });
-            return cleanup;
+            
+            // Listen for backend ready status
+            let cleanupReady = null;
+            if (window.electronAPI.onBackendReady) {
+                cleanupReady = window.electronAPI.onBackendReady(() => {
+                    console.log('Backend is ready!');
+                    setBackendError(null);
+                });
+            }
+            
+            return () => {
+                if (cleanupError) cleanupError();
+                if (cleanupReady) cleanupReady();
+            };
         }
         
         // Check backend connection periodically
@@ -528,6 +541,28 @@ function App() {
                 return;
             }
             
+            // First, check if backend is available
+            try {
+                await api.get('/', { timeout: 3000 });
+            } catch (err) {
+                if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+                    const errorMsg = "Backend server is not running!\n\n" +
+                        "The Python backend needs to be started before opening a dataset.\n\n" +
+                        "Possible causes:\n" +
+                        "1. Python is not installed or not in PATH\n" +
+                        "2. Python dependencies are not installed\n" +
+                        "3. The backend failed to start\n\n" +
+                        "Please check the console for detailed error messages.\n" +
+                        "If the error persists, try:\n" +
+                        "- Restart the application\n" +
+                        "- Install Python 3.10+ and add it to PATH\n" +
+                        "- Install dependencies: pip install -r requirements.txt";
+                    alert(errorMsg);
+                    setBackendError("Backend server is not running. Please check the console for details.");
+                    return;
+                }
+            }
+            
             const path = await window.electronAPI.selectDirectory();
             if (path) {
                 // Clear previous state if opening new dataset
@@ -574,7 +609,12 @@ function App() {
                     console.error(err);
                     let errorMsg = "Failed to load dataset";
                     if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-                        errorMsg = "Cannot connect to backend server. Please make sure the application is running correctly.";
+                        errorMsg = "Cannot connect to backend server.\n\n" +
+                            "The backend may have stopped. Please:\n" +
+                            "1. Check the console for error messages\n" +
+                            "2. Restart the application\n" +
+                            "3. Verify Python is installed and dependencies are installed";
+                        setBackendError("Backend connection lost. Please restart the application.");
                     } else if (err.response?.data?.detail) {
                         errorMsg = err.response.data.detail;
                     } else if (err.message) {
@@ -618,10 +658,29 @@ function App() {
                 {/* Top Bar */}
                 <div className="glass-panel title-drag-region" style={{ minHeight: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column', zIndex: 1000, position: 'relative', boxSizing: 'border-box' }}>
                     {backendError && (
-                        <div style={{ width: '100%', background: 'rgba(255, 68, 68, 0.2)', border: '1px solid #ff4444', padding: '8px 12px', borderRadius: '4px', marginBottom: '8px', fontSize: '0.85rem', color: '#ffaaaa' }}>
-                            ⚠️ {backendError}
-                            <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#ff8888' }}>
-                                Make sure Python is installed and dependencies are installed: pip install -r requirements.txt
+                        <div style={{ 
+                            width: '100%', 
+                            background: 'rgba(255, 68, 68, 0.2)', 
+                            border: '1px solid #ff4444', 
+                            padding: '12px', 
+                            borderRadius: '4px', 
+                            marginBottom: '8px', 
+                            fontSize: '0.85rem', 
+                            color: '#ffaaaa',
+                            whiteSpace: 'pre-line',
+                            lineHeight: '1.5'
+                        }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '0.9rem' }}>
+                                ⚠️ Backend Error
+                            </div>
+                            <div style={{ marginBottom: '8px' }}>
+                                {backendError}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#ff8888', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 136, 136, 0.3)' }}>
+                                <strong>Quick Fix:</strong> Make sure Python 3.10+ is installed and dependencies are installed:<br/>
+                                <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
+                                    pip install -r requirements.txt
+                                </code>
                             </div>
                         </div>
                     )}

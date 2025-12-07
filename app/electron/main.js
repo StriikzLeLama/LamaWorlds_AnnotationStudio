@@ -96,8 +96,9 @@ function startBackend() {
     
     // Try multiple possible backend locations
     const possibleBackendPaths = app.isPackaged ? [
-        path.join(appPath, 'backend'),           // resources/backend (extraFiles)
+        path.join(appPath, 'backend'),           // resources/backend (extraResources)
         path.join(path.dirname(process.execPath), 'resources', 'backend'),  // fallback
+        path.join(path.dirname(process.execPath), 'backend'),  // direct backend folder
         path.join(app.getAppPath(), 'backend')   // app.asar unpacked
     ] : [
         path.join(appPath, 'backend')
@@ -153,46 +154,82 @@ function startBackend() {
     let pythonExecutable = pythonCmd;
     let pythonFound = false;
     
-    // First, check if python command works
-    try {
-        const version = execSync(`${pythonCmd} --version`, { timeout: 2000, encoding: 'utf-8' });
-        console.log(`✓ Python found in PATH: ${version.trim()}`);
-        pythonFound = true;
-    } catch (e) {
-        console.log(`⚠ Python not found in PATH, trying common locations...`);
+    // On Windows, try 'py' launcher first (recommended by Python.org)
+    if (process.platform === 'win32') {
+        try {
+            const version = execSync('py --version', { timeout: 2000, encoding: 'utf-8' });
+            console.log(`✓ Python launcher (py) found: ${version.trim()}`);
+            pythonExecutable = 'py';
+            pythonFound = true;
+        } catch (e) {
+            console.log(`⚠ Python launcher (py) not found, trying 'python' command...`);
+        }
+    }
+    
+    // If py launcher didn't work, try python/python3 command
+    if (!pythonFound) {
+        try {
+            const version = execSync(`${pythonCmd} --version`, { timeout: 2000, encoding: 'utf-8' });
+            console.log(`✓ Python found in PATH: ${version.trim()}`);
+            pythonFound = true;
+        } catch (e) {
+            console.log(`⚠ Python not found in PATH, trying common locations...`);
+        }
+    }
+    
+    // If still not found, try using 'where' command on Windows to find Python
+    if (!pythonFound && process.platform === 'win32') {
+        try {
+            const whereOutput = execSync('where python', { timeout: 2000, encoding: 'utf-8' });
+            const pythonPaths = whereOutput.trim().split('\n').filter(p => p.trim());
+            if (pythonPaths.length > 0) {
+                const firstPath = pythonPaths[0].trim();
+                try {
+                    const version = execSync(`"${firstPath}" --version`, { timeout: 2000, encoding: 'utf-8' });
+                    pythonExecutable = firstPath;
+                    pythonFound = true;
+                    console.log(`✓ Found Python via 'where' command: ${pythonExecutable} (${version.trim()})`);
+                } catch (e) {
+                    console.log(`⚠ Found Python path but couldn't execute: ${firstPath}`);
+                }
+            }
+        } catch (e) {
+            console.log(`⚠ 'where python' command failed: ${e.message}`);
+        }
+    }
+    
+    // If still not found, try common installation paths
+    if (!pythonFound && process.platform === 'win32') {
+        // Try common Python installation paths on Windows
+        const commonPaths = [
+            'C:\\Python310\\python.exe',
+            'C:\\Python311\\python.exe',
+            'C:\\Python312\\python.exe',
+            'C:\\Python313\\python.exe',
+            'C:\\Program Files\\Python310\\python.exe',
+            'C:\\Program Files\\Python311\\python.exe',
+            'C:\\Program Files\\Python312\\python.exe',
+            'C:\\Program Files\\Python313\\python.exe',
+            path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python310', 'python.exe'),
+            path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'),
+            path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe'),
+            path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python313', 'python.exe'),
+            path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python310', 'python.exe'),
+            path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'python.exe'),
+            path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'python.exe'),
+            path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python313', 'python.exe')
+        ];
         
-        if (process.platform === 'win32') {
-            // Try common Python installation paths on Windows
-            const commonPaths = [
-                'C:\\Python310\\python.exe',
-                'C:\\Python311\\python.exe',
-                'C:\\Python312\\python.exe',
-                'C:\\Python313\\python.exe',
-                'C:\\Program Files\\Python310\\python.exe',
-                'C:\\Program Files\\Python311\\python.exe',
-                'C:\\Program Files\\Python312\\python.exe',
-                'C:\\Program Files\\Python313\\python.exe',
-                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python310', 'python.exe'),
-                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'),
-                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe'),
-                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python313', 'python.exe'),
-                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python310', 'python.exe'),
-                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'python.exe'),
-                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'python.exe'),
-                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python313', 'python.exe')
-            ];
-            
-            for (const pyPath of commonPaths) {
-                if (pyPath && fs.existsSync(pyPath)) {
-                    try {
-                        const version = execSync(`"${pyPath}" --version`, { timeout: 2000, encoding: 'utf-8' });
-                        pythonExecutable = pyPath;
-                        pythonFound = true;
-                        console.log(`✓ Found Python at: ${pythonExecutable} (${version.trim()})`);
-                        break;
-                    } catch (e) {
-                        // Continue searching
-                    }
+        for (const pyPath of commonPaths) {
+            if (pyPath && fs.existsSync(pyPath)) {
+                try {
+                    const version = execSync(`"${pyPath}" --version`, { timeout: 2000, encoding: 'utf-8' });
+                    pythonExecutable = pyPath;
+                    pythonFound = true;
+                    console.log(`✓ Found Python at: ${pythonExecutable} (${version.trim()})`);
+                    break;
+                } catch (e) {
+                    console.log(`⚠ Python exists at ${pyPath} but couldn't execute: ${e.message}`);
                 }
             }
         }
@@ -210,7 +247,17 @@ function startBackend() {
         return false;
     }
     
-    backendProcess = spawn(pythonExecutable, ['-m', 'backend.main'], {
+    // Use py -3.10 on Windows if using py launcher, otherwise use the executable directly
+    let spawnArgs = ['-m', 'backend.main'];
+    if (pythonExecutable === 'py' && process.platform === 'win32') {
+        // Try to use Python 3.10 specifically with py launcher
+        spawnArgs = ['-3.10', '-m', 'backend.main'];
+    }
+    
+    console.log(`Spawning backend with: ${pythonExecutable} ${spawnArgs.join(' ')}`);
+    console.log(`Working directory: ${backendPath}`);
+    
+    backendProcess = spawn(pythonExecutable, spawnArgs, {
         cwd: backendPath,
         env: { ...process.env, PYTHONUNBUFFERED: "1" },
         shell: true,
@@ -228,12 +275,39 @@ function startBackend() {
     backendProcess.stderr.on('data', (data) => {
         const output = data.toString();
         console.log(`Backend stderr: ${output}`); // Log all stderr for debugging
-        if (output.includes('ERROR') || output.includes('Traceback') || output.includes('Exception') || output.includes('ModuleNotFoundError')) {
+        
+        // Check for various error patterns
+        if (output.includes('ERROR') || output.includes('Traceback') || output.includes('Exception') || 
+            output.includes('ModuleNotFoundError') || output.includes('ImportError') || 
+            output.includes('No module named') || output.includes('cannot find') ||
+            output.includes('FileNotFoundError') || output.includes('PermissionError')) {
             console.error(`Backend Error: ${output}`);
-            if (mainWindow) {
-                mainWindow.webContents.send('backend-error', `Backend error: ${output}`);
+            let errorMsg = `Backend error detected:\n\n${output.substring(0, 500)}`;
+            
+            // Provide specific help based on error type
+            if (output.includes('ModuleNotFoundError') || output.includes('No module named')) {
+                errorMsg += '\n\nThis usually means Python dependencies are not installed.\n';
+                errorMsg += 'To fix:\n';
+                errorMsg += '1. Open Command Prompt\n';
+                errorMsg += `2. Navigate to: ${backendPath}\n`;
+                errorMsg += '3. Run: pip install -r requirements.txt\n';
+                errorMsg += '4. Restart the application';
+            } else if (output.includes('FileNotFoundError')) {
+                errorMsg += '\n\nA required file is missing.\n';
+                errorMsg += 'Please check that all backend files are present.';
             }
-        } else if (output.includes('INFO') || output.includes('Uvicorn running')) {
+            
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-error', errorMsg);
+            }
+        } else if (output.includes('INFO') || output.includes('Uvicorn running') || output.includes('Application startup complete')) {
+            console.log(`Backend: ${output}`);
+            // Clear any previous errors when backend starts successfully
+            if (mainWindow && output.includes('Uvicorn running')) {
+                mainWindow.webContents.send('backend-ready');
+            }
+        } else {
+            // Log other stderr messages for debugging
             console.log(`Backend: ${output}`);
         }
     });
@@ -241,15 +315,28 @@ function startBackend() {
     backendProcess.on('error', (err) => {
         console.error(`❌ Failed to start backend: ${err.message}`);
         console.error(`   Error code: ${err.code}`);
-        let errorMsg = `Failed to start Python backend: ${err.message}`;
+        console.error(`   Python executable used: ${pythonExecutable}`);
+        console.error(`   Backend path: ${backendPath}`);
+        console.error(`   Environment PATH: ${process.env.PATH}`);
+        
+        let errorMsg = `Failed to start Python backend: ${err.message}\n\n`;
         if (err.code === 'ENOENT') {
-            errorMsg += `\n\nPython is not found in your PATH.`;
-            errorMsg += `\nPlease install Python from https://www.python.org/downloads/`;
-            errorMsg += `\nMake sure to check "Add Python to PATH" during installation.`;
+            errorMsg += `Python executable not found.\n\n`;
+            errorMsg += `Tried: ${pythonExecutable}\n\n`;
+            errorMsg += `Solutions:\n`;
+            errorMsg += `1. Install Python 3.10+ from https://www.python.org/downloads/\n`;
+            errorMsg += `2. During installation, check "Add Python to PATH"\n`;
+            errorMsg += `3. After installation, RESTART your computer (or at least close and reopen this app)\n`;
+            errorMsg += `4. If Python is already installed, verify it's in PATH:\n`;
+            errorMsg += `   - Open Command Prompt\n`;
+            errorMsg += `   - Type: python --version\n`;
+            errorMsg += `   - If it works there but not here, restart the app\n`;
         } else {
-            errorMsg += `\n\nMake sure Python is installed and in your PATH.`;
-            errorMsg += `\nAlso ensure Python dependencies are installed:`;
-            errorMsg += `\n  pip install -r requirements.txt`;
+            errorMsg += `Error code: ${err.code}\n\n`;
+            errorMsg += `Make sure Python 3.10+ is installed and accessible.\n`;
+            errorMsg += `Also ensure Python dependencies are installed:\n`;
+            errorMsg += `  pip install -r requirements.txt\n\n`;
+            errorMsg += `Check the console for detailed error messages.`;
         }
         console.error(errorMsg);
         if (mainWindow) {
@@ -258,31 +345,56 @@ function startBackend() {
     });
 
     backendProcess.on('close', (code, signal) => {
+        console.log(`[Backend] Process closed with code ${code}${signal ? ` (signal: ${signal})` : ''}`);
         if (code !== 0 && code !== null) {
             console.error(`❌ Backend process exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`);
+            console.error(`   Python executable used: ${pythonExecutable}`);
+            console.error(`   Backend path: ${backendPath}`);
+            console.error(`   Working directory: ${backendPath}`);
+            
             let errorMsg = `Backend process exited with code ${code}.\n\n`;
+            errorMsg += `Python: ${pythonExecutable}\n`;
+            errorMsg += `Backend path: ${backendPath}\n\n`;
+            
             if (code === 1) {
                 errorMsg += 'This usually means:\n';
                 errorMsg += '1. Python dependencies are not installed\n';
-                errorMsg += '2. There is an error in the backend code\n\n';
+                errorMsg += '2. There is an error in the backend code\n';
+                errorMsg += '3. Python version is incompatible\n\n';
                 errorMsg += 'To fix:\n';
-                errorMsg += '1. Open a terminal in the application directory\n';
-                errorMsg += '2. Navigate to: resources/backend\n';
+                errorMsg += '1. Open Command Prompt or PowerShell\n';
+                errorMsg += `2. Navigate to: ${backendPath}\n`;
                 errorMsg += '3. Run: pip install -r requirements.txt\n';
-                errorMsg += '4. Check the console for detailed error messages';
+                errorMsg += '   Or: python -m pip install -r requirements.txt\n';
+                errorMsg += '4. Check the console output above for specific error messages\n';
+                errorMsg += '5. Restart the application';
+            } else if (code === 9009 || code === 2) {
+                errorMsg += 'Python executable not found.\n\n';
+                errorMsg += 'Solutions:\n';
+                errorMsg += '1. Install Python 3.10+ from https://www.python.org/downloads/\n';
+                errorMsg += '2. During installation, check "Add Python to PATH"\n';
+                errorMsg += '3. RESTART your computer after installation\n';
+                errorMsg += '4. Verify Python is accessible:\n';
+                errorMsg += '   - Open Command Prompt\n';
+                errorMsg += '   - Type: python --version\n';
+                errorMsg += '   - If it works there, restart this app';
             } else {
+                errorMsg += `Unexpected exit code: ${code}\n`;
                 errorMsg += 'Check the console for detailed error messages.';
             }
             if (mainWindow) {
                 mainWindow.webContents.send('backend-error', errorMsg);
             }
         } else if (code === 0) {
-            console.log(`Backend process exited normally`);
+            console.log(`✓ Backend process exited normally`);
         }
     });
     
     // Give backend a moment to start before checking
     console.log('Backend process spawned, waiting for it to start...');
+    console.log(`Backend process PID: ${backendProcess.pid}`);
+    console.log(`Backend process spawned: ${backendProcess.spawnfile}`);
+    console.log(`Backend process args: ${backendProcess.spawnargs.join(' ')}`);
 
     return true;
 }
