@@ -20,33 +20,48 @@ FunctionEnd
 
 ; Install Python dependencies
 Function InstallPythonDeps
+    ; Check if requirements.txt exists
+    IfFileExists "$INSTDIR\requirements.txt" 0 SkipDeps
+    
     ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\3.10\InstallPath" ""
     IfFileExists "$0python.exe" 0 Check311
-    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    DetailPrint "Installation des dépendances Python..."
+    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"' $1
+    IfErrors 0 Done
+    DetailPrint "Erreur lors de l'installation des dépendances Python (code: $1)"
     Goto Done
+    
     Check311:
     ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\3.11\InstallPath" ""
     IfFileExists "$0python.exe" 0 Check312
-    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    DetailPrint "Installation des dépendances Python..."
+    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"' $1
+    IfErrors 0 Done
+    DetailPrint "Erreur lors de l'installation des dépendances Python (code: $1)"
     Goto Done
+    
     Check312:
     ReadRegStr $0 HKLM "SOFTWARE\Python\PythonCore\3.12\InstallPath" ""
-    IfFileExists "$0python.exe" 0 Done
-    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    IfFileExists "$0python.exe" 0 SkipDeps
+    DetailPrint "Installation des dépendances Python..."
+    ExecWait '"$0python.exe" -m pip install -r "$INSTDIR\requirements.txt"' $1
+    IfErrors 0 Done
+    DetailPrint "Erreur lors de l'installation des dépendances Python (code: $1)"
+    Goto Done
+    
+    SkipDeps:
+    DetailPrint "requirements.txt non trouvé, dépendances Python non installées automatiquement"
+    
     Done:
 FunctionEnd
 
-Section "Install"
+; Note: Files are automatically installed by electron-builder
+; based on the "files" configuration in package.json
+; We only need to add custom installation steps here
+
+Section -Post
+    ; Check for Python and install dependencies after files are installed
     Call CheckPython
-    ; Install files
-    SetOutPath "$INSTDIR"
-    File /r "dist"
-    File /r "electron"
-    File /r "backend"
-    File "package.json"
-    File "requirements.txt"
-    
-    ; Try to install Python dependencies
     Call InstallPythonDeps
 SectionEnd
 

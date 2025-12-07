@@ -3,5 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
     selectFile: (filters) => ipcRenderer.invoke('select-file', filters),
-    readFile: (filePath) => ipcRenderer.invoke('read-file', filePath)
+    readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
+    onBackendError: (callback) => {
+        ipcRenderer.on('backend-error', (event, error) => callback(error));
+    }
 });

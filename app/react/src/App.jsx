@@ -46,8 +46,11 @@ function App() {
     const [saveStatus, setSaveStatus] = useState('Saved');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterAnnotated, setFilterAnnotated] = useState(null); // null = all, true = annotated, false = not annotated
+    const [filterClassId, setFilterClassId] = useState(null); // null = all classes, number = specific class
     const [copiedAnnotation, setCopiedAnnotation] = useState(null);
     const annotationCache = useRef({}); // Cache for annotations
+    const [annotatedImages, setAnnotatedImages] = useState(new Set()); // Set of image paths that have annotations
+    const [backendError, setBackendError] = useState(null); // Backend connection error
     
     // Undo/Redo system - initialize with empty array
     const undoRedoHook = useUndoRedo([]);
@@ -103,6 +106,17 @@ function App() {
                                     setClasses([{ id: 0, name: 'default', color: '#00e0ff' }]);
                                     setSelectedClassId(0);
                                 }
+                                
+                                // Load annotated images list
+                                try {
+                                    const annotatedRes = await api.post('/get_annotated_images', { dataset_path: state.datasetPath });
+                                    if (annotatedRes.data.annotated_images) {
+                                        setAnnotatedImages(new Set(annotatedRes.data.annotated_images));
+                                    }
+                                } catch (err) {
+                                    console.error('Failed to load annotated images:', err);
+                                    // Continue without annotated images list
+                                }
                             } else {
                                 // Dataset exists but no images
                                 localStorage.removeItem('annotationStudio_state');
@@ -129,10 +143,39 @@ function App() {
 
     // Listen for backend errors from Electron
     useEffect(() => {
-        if (window.electronAPI) {
-            // Note: This requires adding an IPC listener in preload.js
-            // For now, we'll handle network errors via Axios interceptor
+        // Listen for backend errors from main process
+        if (window.electronAPI && window.electronAPI.onBackendError) {
+            const cleanup = window.electronAPI.onBackendError((error) => {
+                console.error('Backend error received:', error);
+                setBackendError(error);
+            });
+            return cleanup;
         }
+        
+        // Check backend connection periodically
+        let checkInterval;
+        const checkBackend = async () => {
+            try {
+                await api.get('/', { timeout: 2000 });
+                setBackendError(null);
+            } catch (err) {
+                if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+                    // Don't set error immediately, wait for IPC message from main process
+                    // setBackendError('Cannot connect to backend server. Please check the console for details.');
+                }
+            }
+        };
+        
+        // Check after a delay to allow backend to start, then periodically
+        const initialTimer = setTimeout(() => {
+            checkBackend();
+            checkInterval = setInterval(checkBackend, 5000); // Check every 5 seconds
+        }, 3000);
+        
+        return () => {
+            clearTimeout(initialTimer);
+            if (checkInterval) clearInterval(checkInterval);
+        };
     }, []);
 
     // Save state whenever relevant values change
@@ -144,7 +187,7 @@ function App() {
 
     // Define saveAnnotations first using useCallback
     const saveAnnotations = useCallback(async (newAnnotations, addToHistory = true) => {
-        if (currentImageIndex < 0 || !datasetPath) return;
+        if (currentImageIndex < 0 || currentImageIndex >= images.length || !datasetPath || !images[currentImageIndex]) return;
         
         // Add to undo history
         if (addToHistory) {
@@ -153,16 +196,33 @@ function App() {
         
         setSaveStatus('Saving...');
         try {
+            const currentImagePath = images[currentImageIndex];
+            if (!currentImagePath) {
+                console.error('No image path available for saving');
+                setSaveStatus('Error');
+                return;
+            }
+            
             await api.post('/save_annotation', {
-                image_name: images[currentImageIndex],
+                image_name: currentImagePath,
                 dataset_path: datasetPath,
                 boxes: newAnnotations
             });
             setAnnotations(newAnnotations);
             // Cache annotations
-            if (currentImageIndex >= 0 && images[currentImageIndex]) {
-                annotationCache.current[images[currentImageIndex]] = newAnnotations;
-            }
+            annotationCache.current[currentImagePath] = newAnnotations;
+            
+            // Update annotated images set
+            setAnnotatedImages(prev => {
+                const newSet = new Set(prev);
+                if (newAnnotations.length > 0) {
+                    newSet.add(currentImagePath);
+                } else {
+                    newSet.delete(currentImagePath);
+                }
+                return newSet;
+            });
+            
             setTimeout(() => setSaveStatus('Saved'), 500);
         } catch (err) {
             console.error("Failed to save", err);
@@ -214,7 +274,7 @@ function App() {
 
     // Save annotations before changing image
     const saveCurrentAnnotations = useCallback(async () => {
-        if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath && annotations.length >= 0) {
+        if (currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] && datasetPath) {
             try {
                 await api.post('/save_annotation', {
                     image_name: images[currentImageIndex],
@@ -337,12 +397,28 @@ function App() {
         // Auto-save
         setSaveStatus('Saving...');
         try {
+            const currentImagePath = images[currentImageIndex];
+            if (!currentImagePath) {
+                console.error('No image path available for saving');
+                setSaveStatus('Error');
+                return;
+            }
+            
             await api.post('/save_annotation', {
-                image_name: images[currentImageIndex],
+                image_name: currentImagePath,
                 dataset_path: datasetPath,
                 boxes: newAnns
             });
             setTimeout(() => setSaveStatus('Saved'), 500);
+            
+            // Update annotated images set (should already be in set, but ensure it)
+            if (currentImagePath && newAnns.length > 0) {
+                setAnnotatedImages(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(currentImagePath);
+                    return newSet;
+                });
+            }
         } catch (err) {
             console.error(err);
             setSaveStatus('Error');
@@ -483,6 +559,17 @@ function App() {
                         ]);
                         setSelectedClassId(0);
                     }
+                    
+                    // Load annotated images list
+                    try {
+                        const annotatedRes = await api.post('/get_annotated_images', { dataset_path: path });
+                        if (annotatedRes.data.annotated_images) {
+                            setAnnotatedImages(new Set(annotatedRes.data.annotated_images));
+                        }
+                    } catch (err) {
+                        console.error('Failed to load annotated images:', err);
+                        // Continue without annotated images list
+                    }
                 } catch (err) {
                     console.error(err);
                     let errorMsg = "Failed to load dataset";
@@ -507,10 +594,7 @@ function App() {
     // ... existing ...
 
     // Calculate progress
-    const annotatedCount = images.filter((img, idx) => {
-        // Simplified - would need backend to check all images
-        return idx === currentImageIndex ? annotations.length > 0 : false;
-    }).length;
+    const annotatedCount = images.filter((img) => annotatedImages.has(img)).length;
     const progress = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
 
     return (
@@ -532,7 +616,15 @@ function App() {
             {/* Main Canvas Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 {/* Top Bar */}
-                <div className="glass-panel title-drag-region" style={{ height: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column', zIndex: 1000, position: 'relative', boxSizing: 'border-box' }}>
+                <div className="glass-panel title-drag-region" style={{ minHeight: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column', zIndex: 1000, position: 'relative', boxSizing: 'border-box' }}>
+                    {backendError && (
+                        <div style={{ width: '100%', background: 'rgba(255, 68, 68, 0.2)', border: '1px solid #ff4444', padding: '8px 12px', borderRadius: '4px', marginBottom: '8px', fontSize: '0.85rem', color: '#ffaaaa' }}>
+                            ⚠️ {backendError}
+                            <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#ff8888' }}>
+                                Make sure Python is installed and dependencies are installed: pip install -r requirements.txt
+                            </div>
+                        </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                             <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LAMA ANNOTATION STUDIO</div>
@@ -617,7 +709,7 @@ function App() {
 
                 {/* Canvas */}
                 <div style={{ flex: 1, backgroundColor: '#000', margin: '0 10px 10px 10px', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
-                    {images.length > 0 ? (
+                    {images.length > 0 && currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] ? (
                         <AnnotationCanvas
                             imageUrl={images[currentImageIndex]}
                             annotations={annotations}
@@ -629,7 +721,7 @@ function App() {
                         />
                     ) : (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#555' }}>
-                            No images loaded
+                            {images.length === 0 ? 'No images loaded' : 'No image selected'}
                         </div>
                     )}
                 </div>
@@ -637,6 +729,7 @@ function App() {
 
             {/* Right Panel - Image List & Info */}
             <RightPanel
+                annotatedImages={annotatedImages}
                 images={images}
                 currentIndex={currentImageIndex}
                 setIndex={changeImageIndex}
@@ -657,6 +750,9 @@ function App() {
                 setSearchQuery={setSearchQuery}
                 filterAnnotated={filterAnnotated}
                 setFilterAnnotated={setFilterAnnotated}
+                filterClassId={filterClassId}
+                setFilterClassId={setFilterClassId}
+                annotationCache={annotationCache}
                 onExport={async (format) => {
                     if (!datasetPath) {
                         alert('Please open a dataset first');

@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const http = require('http');
 
 let mainWindow;
@@ -9,18 +9,29 @@ let backendProcess;
 const BACKEND_PORT = 8000;
 
 function createWindow() {
+    // Set application icon
+    const iconPath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'assets', 'Logo', 'LamaWorlds_LogoV3.jpg')
+        : path.join(__dirname, '..', 'assets', 'Logo', 'LamaWorlds_LogoV3.jpg');
+    
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
         backgroundColor: '#0a0a12', // Dark navy
+        icon: fs.existsSync(iconPath) ? iconPath : undefined, // Set icon if file exists
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
-            webSecurity: false // Allow local file loading for images
+            // webSecurity must be false to allow loading local file:// images
+            // This is safe because we're only loading local files, not remote content
+            webSecurity: false,
+            allowRunningInsecureContent: false, // Disable insecure content
+            experimentalFeatures: false
         },
         frame: true,
         show: false, // Don't show until ready
+        autoHideMenuBar: true, // Hide menu bar by default
         titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
         titleBarOverlay: process.platform === 'win32' ? {
             color: '#0a0a12',
@@ -28,11 +39,31 @@ function createWindow() {
         } : undefined
     });
     
-        // Keep menu bar visible
-        // Menu bar is visible by default
+    // Set Content Security Policy to reduce security warnings
+    // Note: We need 'unsafe-eval' for React development, but this is only in dev mode
+    if (!app.isPackaged) {
+        mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+            callback({
+                responseHeaders: {
+                    ...details.responseHeaders,
+                    'Content-Security-Policy': [
+                        "default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* file: data:; " +
+                        "img-src 'self' http://localhost:* file: data: blob:; " +
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
+                        "style-src 'self' 'unsafe-inline' http://localhost:*; " +
+                        "connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:*"
+                    ]
+                }
+            });
+        });
+    }
+    
+    // Hide menu bar
+    mainWindow.setMenuBarVisibility(false);
 
-    // DevTools disabled - uncomment to enable
-    // if (!app.isPackaged) {
+    // DevTools - disabled by default (can be enabled manually with Ctrl+Shift+I or F12)
+    // Uncomment the line below if you need DevTools in development
+    // if (!app.isPackaged || process.env.DEBUG === '1') {
     //     mainWindow.webContents.openDevTools();
     // }
 
@@ -57,29 +88,133 @@ function startBackend() {
     console.log('Starting Python backend...');
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     
-    // In packaged app, use app.getAppPath() to get the correct path
+    // In packaged app, use process.resourcesPath to get the correct path
+    // electron-builder puts extraFiles in resourcesPath
     const appPath = app.isPackaged 
-        ? path.dirname(process.execPath)
+        ? process.resourcesPath
         : path.join(__dirname, '../');
     
-    const backendPath = app.isPackaged
-        ? path.join(appPath, 'resources', 'backend')
-        : path.join(appPath, 'backend');
+    // Try multiple possible backend locations
+    const possibleBackendPaths = app.isPackaged ? [
+        path.join(appPath, 'backend'),           // resources/backend (extraFiles)
+        path.join(path.dirname(process.execPath), 'resources', 'backend'),  // fallback
+        path.join(app.getAppPath(), 'backend')   // app.asar unpacked
+    ] : [
+        path.join(appPath, 'backend')
+    ];
+    
+    let backendPath = null;
+    for (const possiblePath of possibleBackendPaths) {
+        if (fs.existsSync(possiblePath) && fs.existsSync(path.join(possiblePath, 'main.py'))) {
+            backendPath = possiblePath;
+            break;
+        }
+    }
+    
+    if (!backendPath) {
+        // Use first path as default for error message
+        backendPath = possibleBackendPaths[0];
+    }
 
     console.log(`Backend path: ${backendPath}`);
     console.log(`Python command: ${pythonCmd}`);
 
     // Check if backend directory exists
     if (!fs.existsSync(backendPath)) {
-        console.error(`Backend directory not found: ${backendPath}`);
+        console.error(`❌ Backend directory not found: ${backendPath}`);
+        console.error(`   App path: ${appPath}`);
+        console.error(`   Exec path: ${process.execPath}`);
+        console.error(`   Resources path: ${process.resourcesPath}`);
+        if (mainWindow) {
+            mainWindow.webContents.send('backend-error', `Backend directory not found at: ${backendPath}`);
+        }
         return false;
     }
+    
+    // Check if backend/main.py exists
+    const backendMainPath = path.join(backendPath, 'main.py');
+    if (!fs.existsSync(backendMainPath)) {
+        console.error(`❌ Backend main.py not found: ${backendMainPath}`);
+        if (mainWindow) {
+            mainWindow.webContents.send('backend-error', `Backend main.py not found at: ${backendMainPath}`);
+        }
+        return false;
+    }
+    
+    console.log(`✓ Backend directory found: ${backendPath}`);
+    console.log(`✓ Backend main.py found: ${backendMainPath}`);
 
     // Run as module to fix import paths
-    backendProcess = spawn(pythonCmd, ['-m', 'backend.main'], {
+    console.log(`Attempting to start backend with command: ${pythonCmd} -m backend.main`);
+    console.log(`Working directory: ${backendPath}`);
+    console.log(`Python path check: ${pythonCmd}`);
+    
+    // Try to find Python in common locations if not in PATH
+    let pythonExecutable = pythonCmd;
+    let pythonFound = false;
+    
+    // First, check if python command works
+    try {
+        const version = execSync(`${pythonCmd} --version`, { timeout: 2000, encoding: 'utf-8' });
+        console.log(`✓ Python found in PATH: ${version.trim()}`);
+        pythonFound = true;
+    } catch (e) {
+        console.log(`⚠ Python not found in PATH, trying common locations...`);
+        
+        if (process.platform === 'win32') {
+            // Try common Python installation paths on Windows
+            const commonPaths = [
+                'C:\\Python310\\python.exe',
+                'C:\\Python311\\python.exe',
+                'C:\\Python312\\python.exe',
+                'C:\\Python313\\python.exe',
+                'C:\\Program Files\\Python310\\python.exe',
+                'C:\\Program Files\\Python311\\python.exe',
+                'C:\\Program Files\\Python312\\python.exe',
+                'C:\\Program Files\\Python313\\python.exe',
+                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python310', 'python.exe'),
+                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe'),
+                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe'),
+                path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python313', 'python.exe'),
+                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python310', 'python.exe'),
+                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python311', 'python.exe'),
+                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'python.exe'),
+                path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'Python', 'Python313', 'python.exe')
+            ];
+            
+            for (const pyPath of commonPaths) {
+                if (pyPath && fs.existsSync(pyPath)) {
+                    try {
+                        const version = execSync(`"${pyPath}" --version`, { timeout: 2000, encoding: 'utf-8' });
+                        pythonExecutable = pyPath;
+                        pythonFound = true;
+                        console.log(`✓ Found Python at: ${pythonExecutable} (${version.trim()})`);
+                        break;
+                    } catch (e) {
+                        // Continue searching
+                    }
+                }
+            }
+        }
+    }
+    
+    if (!pythonFound) {
+        const errorMsg = 'Python not found!\n\n' +
+            'Please install Python 3.10+ from https://www.python.org/downloads/\n' +
+            'Make sure to check "Add Python to PATH" during installation.\n\n' +
+            'After installation, restart the application.';
+        console.error(`❌ ${errorMsg}`);
+        if (mainWindow) {
+            mainWindow.webContents.send('backend-error', errorMsg);
+        }
+        return false;
+    }
+    
+    backendProcess = spawn(pythonExecutable, ['-m', 'backend.main'], {
         cwd: backendPath,
         env: { ...process.env, PYTHONUNBUFFERED: "1" },
-        shell: true
+        shell: true,
+        stdio: ['ignore', 'pipe', 'pipe'] // Capture all output
     });
 
     backendProcess.stdout.on('data', (data) => {
@@ -92,24 +227,29 @@ function startBackend() {
 
     backendProcess.stderr.on('data', (data) => {
         const output = data.toString();
-        if (output.includes('ERROR') || output.includes('Traceback') || output.includes('Exception')) {
+        console.log(`Backend stderr: ${output}`); // Log all stderr for debugging
+        if (output.includes('ERROR') || output.includes('Traceback') || output.includes('Exception') || output.includes('ModuleNotFoundError')) {
             console.error(`Backend Error: ${output}`);
-        } else {
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-error', `Backend error: ${output}`);
+            }
+        } else if (output.includes('INFO') || output.includes('Uvicorn running')) {
             console.log(`Backend: ${output}`);
         }
     });
 
     backendProcess.on('error', (err) => {
-        console.error(`Failed to start backend: ${err.message}`);
-        let errorMsg = `Failed to start Python backend: ${err.message}\n\n`;
+        console.error(`❌ Failed to start backend: ${err.message}`);
+        console.error(`   Error code: ${err.code}`);
+        let errorMsg = `Failed to start Python backend: ${err.message}`;
         if (err.code === 'ENOENT') {
-            errorMsg += `Python is not found in your PATH.\n`;
-            errorMsg += `Please install Python from https://www.python.org/downloads/\n`;
-            errorMsg += `Make sure to check "Add Python to PATH" during installation.`;
+            errorMsg += `\n\nPython is not found in your PATH.`;
+            errorMsg += `\nPlease install Python from https://www.python.org/downloads/`;
+            errorMsg += `\nMake sure to check "Add Python to PATH" during installation.`;
         } else {
-            errorMsg += `Make sure Python is installed and in your PATH.\n`;
-            errorMsg += `Also ensure Python dependencies are installed:\n`;
-            errorMsg += `  pip install -r requirements.txt`;
+            errorMsg += `\n\nMake sure Python is installed and in your PATH.`;
+            errorMsg += `\nAlso ensure Python dependencies are installed:`;
+            errorMsg += `\n  pip install -r requirements.txt`;
         }
         console.error(errorMsg);
         if (mainWindow) {
@@ -117,13 +257,61 @@ function startBackend() {
         }
     });
 
-    backendProcess.on('close', (code) => {
+    backendProcess.on('close', (code, signal) => {
         if (code !== 0 && code !== null) {
-            console.log(`Backend process exited with code ${code}`);
+            console.error(`❌ Backend process exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`);
+            let errorMsg = `Backend process exited with code ${code}.\n\n`;
+            if (code === 1) {
+                errorMsg += 'This usually means:\n';
+                errorMsg += '1. Python dependencies are not installed\n';
+                errorMsg += '2. There is an error in the backend code\n\n';
+                errorMsg += 'To fix:\n';
+                errorMsg += '1. Open a terminal in the application directory\n';
+                errorMsg += '2. Navigate to: resources/backend\n';
+                errorMsg += '3. Run: pip install -r requirements.txt\n';
+                errorMsg += '4. Check the console for detailed error messages';
+            } else {
+                errorMsg += 'Check the console for detailed error messages.';
+            }
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-error', errorMsg);
+            }
+        } else if (code === 0) {
+            console.log(`Backend process exited normally`);
         }
     });
+    
+    // Give backend a moment to start before checking
+    console.log('Backend process spawned, waiting for it to start...');
 
     return true;
+}
+
+// Helper function to load UI with fallback paths
+function loadUI() {
+    const distPaths = app.isPackaged ? [
+        path.join(app.getAppPath(), 'dist', 'index.html'),
+        path.join(process.resourcesPath, 'app.asar', 'dist', 'index.html'),
+        path.join(process.resourcesPath, 'dist', 'index.html'),
+        path.join(path.dirname(process.execPath), 'resources', 'app.asar', 'dist', 'index.html'),
+        path.join(path.dirname(process.execPath), 'resources', 'dist', 'index.html')
+    ] : [
+        path.join(__dirname, '../dist/index.html')
+    ];
+    
+    for (const distPath of distPaths) {
+        if (fs.existsSync(distPath)) {
+            console.log(`Loading UI from: ${distPath}`);
+            mainWindow.loadFile(distPath).catch(err => {
+                console.error(`Failed to load UI from ${distPath}:`, err);
+            });
+            return true;
+        }
+    }
+    
+    console.error('Could not find UI file in any location. Tried:');
+    distPaths.forEach(p => console.error(`  - ${p}`));
+    return false;
 }
 
 // Check if backend is up
@@ -137,30 +325,41 @@ function checkBackend(callback, maxAttempts = 30) {
                 console.log('Backend is ready!');
                 callback();
             } else {
+                console.log(`Backend returned status ${res.statusCode}, retrying... (${attempts}/${maxAttempts})`);
                 if (attempts < maxAttempts) {
                     setTimeout(check, 1000);
                 } else {
-                    console.error('Backend failed to start after maximum attempts');
-                    if (mainWindow) {
-                        mainWindow.webContents.send('backend-error', 'Backend failed to start');
-                    }
+                    console.error('❌ Backend failed to start after maximum attempts');
+                    // Still call callback to load UI (user will see error in UI)
+                    callback();
                 }
             }
         });
         req.on('error', (e) => {
+            console.log(`Backend not ready yet (${e.message}), retrying... (${attempts}/${maxAttempts})`);
             if (attempts < maxAttempts) {
                 setTimeout(check, 1000);
             } else {
-                console.error('Backend failed to start after maximum attempts');
+                console.error('❌ Backend failed to start after maximum attempts');
+                const errorMsg = 'Backend server did not start. Possible causes:\n' +
+                    '1. Python is not installed or not in PATH\n' +
+                    '2. Python dependencies are not installed (pip install -r requirements.txt)\n' +
+                    '3. Port 8000 is already in use\n' +
+                    'Check the console for detailed error messages.';
                 if (mainWindow) {
-                    mainWindow.webContents.send('backend-error', 'Backend failed to start');
+                    mainWindow.webContents.send('backend-error', errorMsg);
                 }
+                // Still call callback to load UI (user will see error in UI)
+                callback();
             }
         });
         req.setTimeout(2000, () => {
             req.destroy();
             if (attempts < maxAttempts) {
                 setTimeout(check, 1000);
+            } else {
+                console.error('❌ Backend timeout after maximum attempts');
+                callback();
             }
         });
     };
@@ -231,15 +430,18 @@ app.on('ready', () => {
         console.log("Production mode: Starting backend...");
         const backendStarted = startBackend();
         if (backendStarted) {
-            // Wait for backend to be ready before loading the UI
-            checkBackend(() => {
-                console.log("Loading production UI...");
-                mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-            });
+            // Give backend a moment to start before checking
+            setTimeout(() => {
+                // Wait for backend to be ready before loading the UI
+                checkBackend(() => {
+                    console.log("Loading production UI...");
+                    loadUI();
+                });
+            }, 2000); // Wait 2 seconds for backend to start
         } else {
             // If backend failed to start, still try to load UI (user will see error)
             console.error("Backend failed to start, loading UI anyway...");
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+            loadUI();
         }
     }
 });
@@ -267,13 +469,13 @@ app.on('activate', function () {
                             }
                         }
                         console.error("Failed to load dev URL, falling back to file");
-                        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+                        loadUI();
                     }
                 };
                 tryLoadUrl(startUrl);
             }, 1000);
         } else {
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+            loadUI();
         }
     }
 });

@@ -35,7 +35,8 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     }, []);
 
     const getColor = (clsId) => {
-        const cls = classes.find(c => c.id === clsId);
+        if (!classes || !Array.isArray(classes)) return '#00e0ff';
+        const cls = classes.find(c => c && c.id === clsId);
         return cls ? cls.color : '#00e0ff';
     };
 
@@ -165,10 +166,11 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     };
 
     const handleDragEnd = (e, id) => {
-        const box = annotations.find(a => a.id === id);
-        if (box) {
+        if (!annotations || !Array.isArray(annotations)) return;
+        const box = annotations.find(a => a && a.id === id);
+        if (box && e.target) {
             const newAnns = annotations.map(a => {
-                if (a.id === id) {
+                if (a && a.id === id) {
                     return {
                         ...a,
                         x: e.target.x(),
@@ -182,7 +184,8 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     };
 
     const handleTransformEnd = (e) => {
-        const node = layerRef.current?.findOne(`#${selectedId}`);
+        if (!selectedId || !layerRef.current) return;
+        const node = layerRef.current.findOne(`#${selectedId}`);
         if (!node) return;
 
         const scaleX = node.scaleX();
@@ -192,8 +195,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         node.scaleX(1);
         node.scaleY(1);
 
+        if (!annotations || !Array.isArray(annotations)) return;
         const newAnns = annotations.map(a => {
-            if (a.id === selectedId) {
+            if (a && a.id === selectedId) {
                 return {
                     ...a,
                     x: node.x(),

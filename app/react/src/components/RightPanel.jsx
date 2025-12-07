@@ -1,14 +1,47 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle } from 'lucide-react';
+import axios from 'axios';
 
-function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated }) {
+const API_URL = 'http://localhost:8000';
+const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+
+function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated, annotatedImages, filterClassId, setFilterClassId, annotationCache }) {
     const activeRef = useRef(null);
+    const [imagesByClass, setImagesByClass] = useState(new Set());
+    const [loadingClassFilter, setLoadingClassFilter] = useState(false);
 
     useEffect(() => {
         if (activeRef.current) {
             activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }, [currentIndex]);
+
+    // Load images filtered by class when filterClassId changes
+    useEffect(() => {
+        if (filterClassId !== null && datasetPath) {
+            setLoadingClassFilter(true);
+            api.post('/get_annotated_images', { 
+                dataset_path: datasetPath, 
+                class_id: filterClassId 
+            })
+            .then(res => {
+                if (res.data && res.data.annotated_images) {
+                    setImagesByClass(new Set(res.data.annotated_images));
+                } else {
+                    setImagesByClass(new Set());
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load images by class:', err);
+                setImagesByClass(new Set());
+            })
+            .finally(() => {
+                setLoadingClassFilter(false);
+            });
+        } else {
+            setImagesByClass(new Set());
+        }
+    }, [filterClassId, datasetPath]);
 
     const getName = (path) => {
         // Handle both / and \ 
@@ -27,33 +60,48 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
         }
     };
     
-    // Track which images have annotations (simplified - would need backend support for full accuracy)
-    const imageAnnotationStatus = useRef({});
-    useEffect(() => {
-        if (currentIndex >= 0 && images[currentIndex]) {
-            imageAnnotationStatus.current[images[currentIndex]] = annotations.length > 0;
-        }
-    }, [annotations, currentIndex, images]);
-    
     // Filter and search images
     const filteredImages = useMemo(() => {
-        return images.filter((img, idx) => {
+        if (!images || !Array.isArray(images)) return [];
+        
+        return images.filter((img) => {
+            if (!img) return false;
+            
             const name = getName(img).toLowerCase();
             const matchesSearch = !searchQuery || name.includes(searchQuery.toLowerCase());
-            const hasAnnotations = imageAnnotationStatus.current[img] || false;
+            const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
             const matchesFilter = filterAnnotated === null || 
                 (filterAnnotated === true && hasAnnotations) || 
                 (filterAnnotated === false && !hasAnnotations);
-            return matchesSearch && matchesFilter;
+            
+            // Filter by class if specified
+            let matchesClass = true;
+            if (filterClassId !== null) {
+                // Use backend-filtered images set if available
+                if (imagesByClass.size > 0) {
+                    matchesClass = imagesByClass.has(img);
+                } else if (hasAnnotations && annotationCache && annotationCache.current) {
+                    // Fallback to cache if backend hasn't loaded yet
+                    const cachedAnns = annotationCache.current[img] || [];
+                    matchesClass = cachedAnns.some(ann => ann && ann.class_id === filterClassId);
+                } else {
+                    // If no data available, don't filter (show all)
+                    matchesClass = true;
+                }
+            }
+            
+            return matchesSearch && matchesFilter && matchesClass;
         });
-    }, [images, searchQuery, filterAnnotated]);
+    }, [images, searchQuery, filterAnnotated, annotatedImages, filterClassId, annotationCache, imagesByClass]);
     
     // Create mapping from filtered to original index
     const filteredToOriginal = useMemo(() => {
         const mapping = new Map();
         filteredImages.forEach((filteredImg, filteredIdx) => {
             const originalIdx = images.indexOf(filteredImg);
-            mapping.set(filteredIdx, originalIdx);
+            if (originalIdx >= 0) {
+                mapping.set(filteredIdx, originalIdx);
+            }
         });
         return mapping;
     }, [filteredImages, images]);
@@ -172,22 +220,23 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                         />
                     </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                            onClick={() => setFilterAnnotated && setFilterAnnotated(null)}
-                            style={{
-                                flex: 1,
-                                padding: '4px 8px',
-                                background: filterAnnotated === null ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            All
-                        </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                                onClick={() => setFilterAnnotated && setFilterAnnotated(null)}
+                                style={{
+                                    flex: 1,
+                                    padding: '4px 8px',
+                                    background: filterAnnotated === null ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                All
+                            </button>
                         <button
                             onClick={() => setFilterAnnotated && setFilterAnnotated(true)}
                             style={{
@@ -228,20 +277,64 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             <Circle size={12} />
                             Empty
                         </button>
+                        </div>
+                        {/* Class Filter */}
+                        <div style={{ position: 'relative' }}>
+                            <select
+                                value={filterClassId === null ? '' : filterClassId}
+                                onChange={(e) => setFilterClassId && setFilterClassId(e.target.value === '' ? null : parseInt(e.target.value))}
+                                disabled={loadingClassFilter}
+                                style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    cursor: loadingClassFilter ? 'wait' : 'pointer',
+                                    outline: 'none',
+                                    opacity: loadingClassFilter ? 0.6 : 1
+                                }}
+                            >
+                                <option value="">All Classes</option>
+                                {classes.map(cls => (
+                                    <option key={cls.id} value={cls.id} style={{ background: '#1a1a2e', color: 'white' }}>
+                                        {cls.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {loadingClassFilter && (
+                                <div style={{
+                                    position: 'absolute',
+                                    right: '8px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    fontSize: '0.7rem',
+                                    color: '#00e0ff'
+                                }}>
+                                    Loading...
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                     {filteredImages.map((img, filteredIdx) => {
                         const originalIdx = filteredToOriginal.get(filteredIdx);
-                        const isCurrent = originalIdx === currentIndex;
-                        const hasAnnotations = imageAnnotationStatus.current[img] || false;
+                        const isCurrent = originalIdx !== undefined && originalIdx === currentIndex;
+                        const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
                         
                         return (
                             <div
                                 key={img}
                                 ref={isCurrent ? activeRef : null}
-                                onClick={() => setIndex(originalIdx)}
+                                onClick={() => {
+                                    if (originalIdx !== undefined && originalIdx >= 0) {
+                                        setIndex(originalIdx);
+                                    }
+                                }}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',

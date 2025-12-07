@@ -9,8 +9,8 @@
         "preview": "vite preview",
         "electron": "electron .",
         "start": "npm run dev",
-        "build:app": "npm run build && node build-config.js && electron-builder",
-        "build:win": "npm run build && node build-config.js && electron-builder --win",
+        "build:app": "npm run build && node setup-icon.js && node build-config.js && electron-builder",
+        "build:win": "npm run build && node setup-icon.js && node build-config.js && electron-builder --win",
         "dist": "electron-builder",
         "postinstall": "electron-builder install-app-deps"
     },
@@ -59,8 +59,16 @@
         "extraFiles": [
             {
                 "from": "backend",
-                "to": "resources/backend",
+                "to": "backend",
                 "filter": ["**/*", "!__pycache__/**/*", "!**/*.pyc"]
+            },
+            {
+                "from": "requirements.txt",
+                "to": "requirements.txt"
+            },
+            {
+                "from": "assets/Logo/LamaWorlds_LogoV3.jpg",
+                "to": "assets/Logo/LamaWorlds_LogoV3.jpg"
             }
         ],
         "directories": {
@@ -74,7 +82,8 @@
                     "arch": ["x64"]
                 }
             ],
-            "artifactName": "${productName}-${version}-Setup.${ext}"
+            "artifactName": "${productName}-${version}-Setup.${ext}",
+            "icon": "resources/icon.jpg"
         },
         "nsis": {
             "oneClick": false,
@@ -84,6 +93,7 @@
             "shortcutName": "Lama Annotation Studio",
             "include": "resources/installer.nsh"
         },
-        "compression": "maximum"
+        "compression": "maximum",
+        "publish": null
     }
 }

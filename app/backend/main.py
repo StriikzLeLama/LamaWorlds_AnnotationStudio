@@ -30,6 +30,8 @@ def read_root():
 @app.post("/load_dataset")
 def load_dataset(data: DatasetPath):
     path = data.path
+    if not path or not isinstance(path, str):
+        raise HTTPException(status_code=400, detail="Invalid path provided")
     if not os.path.isdir(path):
         raise HTTPException(status_code=400, detail="Directory not found")
     
@@ -128,14 +130,63 @@ def load_annotation(dataset_path: str = Body(...), image_path: str = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+@app.post("/get_annotated_images")
+def get_annotated_images(dataset_path: str = Body(...), class_id: int = Body(None)):
+    """Return list of image paths that have annotation files, optionally filtered by class_id"""
+    try:
+        annotated_images = []
+        
+        # Determine labels directory
+        labels_dir = os.path.join(dataset_path, "labels")
+        if not os.path.exists(labels_dir):
+            # Try flat structure
+            labels_dir = dataset_path
+        
+        # Find all .txt files in labels directory
+        label_files = glob.glob(os.path.join(labels_dir, "*.txt"))
+        
+        # Determine images directory
+        images_dir = os.path.join(dataset_path, "images")
+        if not os.path.exists(images_dir):
+            images_dir = dataset_path
+        
+        for label_file in label_files:
+            # Check if file is not empty
+            if os.path.getsize(label_file) > 0:
+                # If filtering by class, check if file contains that class
+                if class_id is not None:
+                    boxes = parse_yolo_file(label_file)
+                    has_class = any(box.get('class_id') == class_id for box in boxes)
+                    if not has_class:
+                        continue
+                
+                base_name = os.path.splitext(os.path.basename(label_file))[0]
+                
+                # Try to find corresponding image
+                for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.JPG', '.JPEG', '.PNG', '.BMP']:
+                    image_path = os.path.join(images_dir, base_name + ext)
+                    if os.path.exists(image_path):
+                        annotated_images.append(os.path.abspath(image_path))
+                        break
+        
+        return {"annotated_images": annotated_images}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/save_annotation")
 def save_annotation_endpoint(data: AnnotationData):
     try:
+        if not data.image_name or not data.dataset_path:
+            raise HTTPException(status_code=400, detail="Image name and dataset path are required")
+        
         # Determine full path
         if os.path.isabs(data.image_name):
             image_full_path = data.image_name
         else:
+            # Try images subdirectory first, then flat structure
             image_full_path = os.path.join(data.dataset_path, "images", data.image_name)
+            if not os.path.exists(image_full_path):
+                image_full_path = os.path.join(data.dataset_path, data.image_name)
 
         # Verify image exists
         if not os.path.exists(image_full_path):
