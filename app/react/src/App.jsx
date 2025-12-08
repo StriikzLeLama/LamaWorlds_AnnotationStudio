@@ -5,6 +5,8 @@ import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
 import AnnotationCanvas from './components/AnnotationCanvas';
 import StatsPanel from './components/StatsPanel';
+import ValidationPanel from './components/ValidationPanel';
+import KeyboardShortcuts from './components/KeyboardShortcuts';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import './styles/index.css';
 
@@ -42,6 +44,8 @@ function App() {
     const [selectedClassId, setSelectedClassId] = useState(0);
     const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
     const [selectedAnnotationIds, setSelectedAnnotationIds] = useState(new Set()); // Multiple selection
+    const [navigationHistory, setNavigationHistory] = useState([]); // History for back/forward navigation
+    const [historyIndex, setHistoryIndex] = useState(-1);
     const [loading, setLoading] = useState(false);
     const [saveStatus, setSaveStatus] = useState('Saved');
     const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +55,7 @@ function App() {
     const annotationCache = useRef({}); // Cache for annotations
     const [annotatedImages, setAnnotatedImages] = useState(new Set()); // Set of image paths that have annotations
     const [backendError, setBackendError] = useState(null); // Backend connection error
+    const [showShortcuts, setShowShortcuts] = useState(false); // Show keyboard shortcuts help
     
     // Undo/Redo system - initialize with empty array
     const undoRedoHook = useUndoRedo([]);
@@ -303,20 +308,56 @@ function App() {
     }, [currentImageIndex, images, datasetPath, annotations]);
 
     // Change image with auto-save
-    const changeImageIndex = useCallback(async (newIndex) => {
+    const changeImageIndex = useCallback(async (newIndex, addToHistory = true) => {
         if (newIndex === currentImageIndex) return;
+        if (newIndex < 0 || newIndex >= images.length) return;
         
         // Save current annotations before changing
         if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath) {
             await saveCurrentAnnotations();
         }
         
+        // Add to navigation history
+        if (addToHistory && currentImageIndex >= 0) {
+            const newHistory = navigationHistory.slice(0, historyIndex + 1);
+            newHistory.push(currentImageIndex);
+            setNavigationHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        }
+        
         setCurrentImageIndex(newIndex);
-    }, [currentImageIndex, images, datasetPath, saveCurrentAnnotations]);
+        setSelectedAnnotationId(null);
+        setSelectedAnnotationIds(new Set());
+    }, [currentImageIndex, images, datasetPath, saveCurrentAnnotations, navigationHistory, historyIndex]);
+    
+    // Navigation history functions
+    const navigateBack = useCallback(() => {
+        if (historyIndex >= 0 && navigationHistory[historyIndex] !== undefined) {
+            const prevIndex = navigationHistory[historyIndex];
+            setHistoryIndex(historyIndex - 1);
+            changeImageIndex(prevIndex, false);
+        }
+    }, [historyIndex, navigationHistory, changeImageIndex]);
+    
+    const navigateForward = useCallback(() => {
+        if (historyIndex < navigationHistory.length - 1) {
+            const nextIndex = navigationHistory[historyIndex + 1];
+            setHistoryIndex(historyIndex + 1);
+            changeImageIndex(nextIndex, false);
+        }
+    }, [historyIndex, navigationHistory, changeImageIndex]);
+    
+    const canNavigateBack = historyIndex >= 0;
+    const canNavigateForward = historyIndex < navigationHistory.length - 1;
 
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // Only handle if not typing in input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+            
             // Undo/Redo
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 handleUndo();
@@ -350,20 +391,97 @@ function App() {
                 e.preventDefault();
             }
             
-            // Arrow keys to navigate images (only if not typing in input)
-            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
-                if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
-                    if (currentImageIndex < images.length - 1) {
-                        changeImageIndex(currentImageIndex + 1);
+            // Batch operations on selected annotations
+            if (selectedAnnotationIds.size > 0) {
+                // Change class of all selected (1-9 keys)
+                const numKey = parseInt(e.key);
+                if (!isNaN(numKey) && numKey >= 1 && numKey <= 9 && !e.ctrlKey && !e.metaKey) {
+                    const classIndex = numKey - 1;
+                    if (classes[classIndex]) {
+                        const newAnns = annotations.map(a => 
+                            selectedAnnotationIds.has(a.id) 
+                                ? { ...a, class_id: classes[classIndex].id }
+                                : a
+                        );
+                        saveAnnotations(newAnns);
                         e.preventDefault();
                     }
                 }
-                if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
-                    if (currentImageIndex > 0) {
-                        changeImageIndex(currentImageIndex - 1);
-                        e.preventDefault();
-                    }
+            }
+            
+            // Arrow keys to navigate images
+            if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
+                if (currentImageIndex < images.length - 1) {
+                    changeImageIndex(currentImageIndex + 1);
+                    e.preventDefault();
                 }
+            }
+            if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
+                if (currentImageIndex > 0) {
+                    changeImageIndex(currentImageIndex - 1);
+                    e.preventDefault();
+                }
+            }
+            
+            // Home/End for first/last image
+            if (e.key === 'Home' && !e.ctrlKey && !e.metaKey) {
+                if (images.length > 0) {
+                    changeImageIndex(0);
+                    e.preventDefault();
+                }
+            }
+            if (e.key === 'End' && !e.ctrlKey && !e.metaKey) {
+                if (images.length > 0) {
+                    changeImageIndex(images.length - 1);
+                    e.preventDefault();
+                }
+            }
+            
+            // N for next unannotated image
+            if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                const nextUnannotated = images.findIndex((img, idx) => 
+                    idx > currentImageIndex && !annotatedImages.has(img)
+                );
+                if (nextUnannotated >= 0) {
+                    changeImageIndex(nextUnannotated);
+                    e.preventDefault();
+                }
+            }
+            
+            // Shift+N for previous unannotated
+            if (e.key === 'N' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                const prevUnannotated = images.slice(0, currentImageIndex).reverse().findIndex(img => 
+                    !annotatedImages.has(img)
+                );
+                if (prevUnannotated >= 0) {
+                    const actualIndex = currentImageIndex - prevUnannotated - 1;
+                    changeImageIndex(actualIndex);
+                    e.preventDefault();
+                }
+            }
+            
+            // Select all annotations (Ctrl+A)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
+                if (annotations.length > 0) {
+                    setSelectedAnnotationIds(new Set(annotations.map(a => a.id)));
+                    e.preventDefault();
+                }
+            }
+            
+            // Navigation history (Alt+Left/Right)
+            if (e.altKey && e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
+                navigateBack();
+                e.preventDefault();
+            }
+            if (e.altKey && e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
+                navigateForward();
+                e.preventDefault();
+            }
+            
+            // Show shortcuts help (? or F1)
+            if (e.key === '?' || e.key === 'F1') {
+                setShowShortcuts(prev => !prev);
+                e.preventDefault();
             }
         };
 
@@ -648,10 +766,28 @@ function App() {
                 selectedAnnotationId={selectedAnnotationId}
                 onChangeAnnotationClass={onChangeAnnotationClass}
                 onImportYaml={handleImportYaml}
+                annotations={annotations}
+                onBatchDeleteClass={(classId) => {
+                    const newAnns = annotations.filter(a => a.class_id !== classId);
+                    saveAnnotations(newAnns);
+                }}
             />
 
             {/* Stats Panel */}
-            {datasetPath && <StatsPanel images={images} annotations={annotations} classes={classes} datasetPath={datasetPath} />}
+            {datasetPath && <StatsPanel images={images} annotations={annotations} classes={classes} datasetPath={datasetPath} annotatedImages={annotatedImages} />}
+            
+            {/* Validation Panel */}
+            {datasetPath && currentImageIndex >= 0 && images[currentImageIndex] && (
+                <ValidationPanel
+                    annotations={annotations}
+                    currentImagePath={images[currentImageIndex]}
+                    datasetPath={datasetPath}
+                    onFixAnnotation={(annId) => {
+                        const newAnns = annotations.filter(a => a.id !== annId);
+                        saveAnnotations(newAnns);
+                    }}
+                />
+            )}
 
             {/* Main Canvas Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -687,43 +823,129 @@ function App() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                             <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LAMA ANNOTATION STUDIO</div>
+                            <button
+                                onClick={() => setShowShortcuts(true)}
+                                style={{
+                                    background: 'rgba(0, 224, 255, 0.1)',
+                                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                                    borderRadius: '4px',
+                                    padding: '4px 8px',
+                                    color: '#00e0ff',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                                title="Keyboard Shortcuts (?)"
+                            >
+                                <span>?</span> Help
+                            </button>
                             <div style={{ fontSize: '0.8rem', color: saveStatus === 'Error' ? '#ff4444' : '#00ff00', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
                                 {saveStatus}
                             </div>
-                            {(canUndo || canRedo) && (
-                                <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#aaa' }}>
-                                    <button
-                                        onClick={handleUndo}
-                                        disabled={!canUndo}
-                                        style={{
-                                            padding: '2px 8px',
-                                            background: canUndo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            borderRadius: '4px',
-                                            color: canUndo ? '#00e0ff' : '#666',
-                                            cursor: canUndo ? 'pointer' : 'not-allowed',
-                                            fontSize: '0.75rem'
-                                        }}
-                                    >
-                                        Undo (Ctrl+Z)
-                                    </button>
-                                    <button
-                                        onClick={handleRedo}
-                                        disabled={!canRedo}
-                                        style={{
-                                            padding: '2px 8px',
-                                            background: canRedo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            borderRadius: '4px',
-                                            color: canRedo ? '#00e0ff' : '#666',
-                                            cursor: canRedo ? 'pointer' : 'not-allowed',
-                                            fontSize: '0.75rem'
-                                        }}
-                                    >
-                                        Redo (Ctrl+Y)
-                                    </button>
-                                </div>
-                            )}
+                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#aaa', alignItems: 'center' }}>
+                                {(canUndo || canRedo) && (
+                                    <>
+                                        <button
+                                            onClick={handleUndo}
+                                            disabled={!canUndo}
+                                            style={{
+                                                padding: '2px 8px',
+                                                background: canUndo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '4px',
+                                                color: canUndo ? '#00e0ff' : '#666',
+                                                cursor: canUndo ? 'pointer' : 'not-allowed',
+                                                fontSize: '0.75rem'
+                                            }}
+                                        >
+                                            Undo (Ctrl+Z)
+                                        </button>
+                                        <button
+                                            onClick={handleRedo}
+                                            disabled={!canRedo}
+                                            style={{
+                                                padding: '2px 8px',
+                                                background: canRedo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '4px',
+                                                color: canRedo ? '#00e0ff' : '#666',
+                                                cursor: canRedo ? 'pointer' : 'not-allowed',
+                                                fontSize: '0.75rem'
+                                            }}
+                                        >
+                                            Redo (Ctrl+Y)
+                                        </button>
+                                    </>
+                                )}
+                                {/* Navigation history */}
+                                {(canNavigateBack || canNavigateForward) && (
+                                    <>
+                                        <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.2)' }} />
+                                        <button
+                                            onClick={navigateBack}
+                                            disabled={!canNavigateBack}
+                                            style={{
+                                                padding: '2px 8px',
+                                                background: canNavigateBack ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '4px',
+                                                color: canNavigateBack ? '#00e0ff' : '#666',
+                                                cursor: canNavigateBack ? 'pointer' : 'not-allowed',
+                                                fontSize: '0.75rem'
+                                            }}
+                                            title="Alt+Left"
+                                        >
+                                            ← Back
+                                        </button>
+                                        <button
+                                            onClick={navigateForward}
+                                            disabled={!canNavigateForward}
+                                            style={{
+                                                padding: '2px 8px',
+                                                background: canNavigateForward ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '4px',
+                                                color: canNavigateForward ? '#00e0ff' : '#666',
+                                                cursor: canNavigateForward ? 'pointer' : 'not-allowed',
+                                                fontSize: '0.75rem'
+                                            }}
+                                            title="Alt+Right"
+                                        >
+                                            Forward →
+                                        </button>
+                                    </>
+                                )}
+                                {/* Next unannotated */}
+                                {images.length > 0 && (
+                                    <>
+                                        <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.2)' }} />
+                                        <button
+                                            onClick={() => {
+                                                const nextUnannotated = images.findIndex((img, idx) => 
+                                                    idx > currentImageIndex && !annotatedImages.has(img)
+                                                );
+                                                if (nextUnannotated >= 0) {
+                                                    changeImageIndex(nextUnannotated);
+                                                }
+                                            }}
+                                            style={{
+                                                padding: '2px 8px',
+                                                background: 'rgba(0, 224, 255, 0.1)',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                borderRadius: '4px',
+                                                color: '#00e0ff',
+                                                cursor: 'pointer',
+                                                fontSize: '0.75rem'
+                                            }}
+                                            title="Next Unannotated (N)"
+                                        >
+                                            Next Empty (N)
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             {!datasetPath && (
@@ -768,7 +990,20 @@ function App() {
 
                 {/* Canvas */}
                 <div style={{ flex: 1, backgroundColor: '#000', margin: '0 10px 10px 10px', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
-                    {images.length > 0 && currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] ? (
+                    {loading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#00e0ff' }}>
+                            <div style={{ 
+                                width: '40px', 
+                                height: '40px', 
+                                border: '3px solid rgba(0, 224, 255, 0.3)', 
+                                borderTop: '3px solid #00e0ff', 
+                                borderRadius: '50%', 
+                                animation: 'spin 1s linear infinite',
+                                marginBottom: '20px'
+                            }}></div>
+                            <div>Loading...</div>
+                        </div>
+                    ) : images.length > 0 && currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] ? (
                         <AnnotationCanvas
                             imageUrl={images[currentImageIndex]}
                             annotations={annotations}
@@ -777,10 +1012,23 @@ function App() {
                             classes={classes}
                             selectedId={selectedAnnotationId}
                             onSelect={setSelectedAnnotationId}
+                            selectedIds={selectedAnnotationIds}
+                            onSelectMultiple={setSelectedAnnotationIds}
                         />
                     ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#555' }}>
-                            {images.length === 0 ? 'No images loaded' : 'No image selected'}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#555', gap: '20px' }}>
+                            {images.length === 0 ? (
+                                <>
+                                    <div style={{ fontSize: '3rem' }}>📁</div>
+                                    <div style={{ fontSize: '1.2rem' }}>No images loaded</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#666' }}>Click "Open Dataset Folder" to get started</div>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ fontSize: '3rem' }}>🖼️</div>
+                                    <div style={{ fontSize: '1.2rem' }}>No image selected</div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -817,28 +1065,50 @@ function App() {
                         alert('Please open a dataset first');
                         return;
                     }
-                    // Validation before export
-                    const invalidAnnotations = annotations.filter(ann => 
-                        ann.width <= 0 || ann.height <= 0 || 
-                        ann.x < 0 || ann.y < 0
-                    );
-                    if (invalidAnnotations.length > 0) {
-                        const proceed = window.confirm(
-                            `Found ${invalidAnnotations.length} invalid annotation(s). Continue anyway?`
+                    
+                    // Validation before export (except for reports)
+                    if (format !== 'report') {
+                        const invalidAnnotations = annotations.filter(ann => 
+                            ann.width <= 0 || ann.height <= 0 || 
+                            ann.x < 0 || ann.y < 0
                         );
-                        if (!proceed) return;
+                        if (invalidAnnotations.length > 0) {
+                            const proceed = window.confirm(
+                                `Found ${invalidAnnotations.length} invalid annotation(s). Continue anyway?`
+                            );
+                            if (!proceed) return;
+                        }
                     }
                     
                     try {
                         setLoading(true);
-                        const res = await api.post('/export', {
-                            dataset_path: datasetPath,
-                            format: format
-                        });
-                        if (format === 'coco') {
-                            alert(`Exported to: ${res.data.file}`);
+                        if (format === 'report') {
+                            const res = await api.post('/export_report', {
+                                dataset_path: datasetPath
+                            });
+                            const report = res.data.report;
+                            const summary = report.summary;
+                            const reportText = `Quality Report Generated!\n\n` +
+                                `Dataset: ${datasetPath}\n` +
+                                `Generated: ${new Date(report.generated_at).toLocaleString()}\n\n` +
+                                `Summary:\n` +
+                                `- Total Images: ${summary.total_images}\n` +
+                                `- Annotated: ${summary.annotated_images} (${summary.completion_percentage.toFixed(1)}%)\n` +
+                                `- Total Annotations: ${summary.total_annotations}\n` +
+                                `- Invalid: ${summary.invalid_annotations}\n` +
+                                `- Avg per Image: ${summary.avg_annotations_per_image.toFixed(1)}\n\n` +
+                                `Report saved to: ${res.data.file}`;
+                            alert(reportText);
                         } else {
-                            alert(`Exported ${res.data.count} files to: ${res.data.dir}`);
+                            const res = await api.post('/export', {
+                                dataset_path: datasetPath,
+                                format: format
+                            });
+                            if (format === 'coco') {
+                                alert(`Exported to: ${res.data.file}`);
+                            } else {
+                                alert(`Exported ${res.data.count} files to: ${res.data.dir}`);
+                            }
                         }
                     } catch (err) {
                         console.error(err);
@@ -849,6 +1119,9 @@ function App() {
                     }
                 }}
             />
+            
+            {/* Keyboard Shortcuts Help */}
+            {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
         </div>
     );
 }

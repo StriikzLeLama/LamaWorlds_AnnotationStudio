@@ -503,40 +503,73 @@ app.on('ready', () => {
     if (isDev) {
         console.log("Dev mode: Assuming backend is managed by runner.");
         console.log(`Loading URL: ${startUrl}`);
+        
+        // Helper to check if a URL is accessible
+        const checkUrl = (url) => {
+            return new Promise((resolve) => {
+                const req = http.get(url, (res) => {
+                    resolve(res.statusCode === 200);
+                });
+                req.on('error', () => resolve(false));
+                req.setTimeout(1000, () => {
+                    req.destroy();
+                    resolve(false);
+                });
+            });
+        };
+        
         // Wait a bit for Vite to be ready and try multiple ports if needed
-        const tryLoadUrl = async (url, retries = 3) => {
+        const tryLoadUrl = async (url, retries = 5) => {
             for (let i = 0; i < retries; i++) {
-                try {
-                    await mainWindow.loadURL(url);
-                    console.log(`Successfully loaded: ${url}`);
-                    return;
-                } catch (e) {
-                    console.log(`Attempt ${i + 1} failed for ${url}, trying alternative ports...`);
-                    // Try alternative ports
-                    const basePort = 5173;
-                    for (let port = basePort; port <= 5180; port++) {
-                        const altUrl = `http://127.0.0.1:${port}`;
+                // Check if URL is accessible first
+                const isAccessible = await checkUrl(url);
+                if (isAccessible) {
+                    try {
+                        await mainWindow.loadURL(url);
+                        console.log(`✓ Successfully loaded: ${url}`);
+                        return true;
+                    } catch (e) {
+                        console.log(`Failed to load ${url}: ${e.message}`);
+                    }
+                } else {
+                    console.log(`URL ${url} not accessible yet, waiting... (${i + 1}/${retries})`);
+                }
+                
+                // Try alternative ports
+                const basePort = parseInt(url.match(/:(\d+)/)?.[1] || '5173');
+                for (let port = basePort; port <= 5180; port++) {
+                    const altUrl = `http://127.0.0.1:${port}`;
+                    const altAccessible = await checkUrl(altUrl);
+                    if (altAccessible) {
                         try {
                             await mainWindow.loadURL(altUrl);
-                            console.log(`Successfully loaded alternative URL: ${altUrl}`);
-                            return;
+                            console.log(`✓ Successfully loaded alternative URL: ${altUrl}`);
+                            return true;
                         } catch (err) {
                             // Continue trying
                         }
                     }
-                    if (i < retries - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
+                }
+                
+                if (i < retries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             }
             // Fallback to dist
-            console.error("Failed to load dev URL, falling back to file");
-            mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+            console.warn("⚠ Failed to load dev URL, falling back to dist");
+            const distPath = path.join(__dirname, '../dist/index.html');
+            if (fs.existsSync(distPath)) {
+                mainWindow.loadFile(distPath);
+            } else {
+                console.error("❌ Dist folder not found. Please run 'npm run build' first.");
+            }
+            return false;
         };
         
+        // Wait a bit for services to start
         setTimeout(() => {
             tryLoadUrl(startUrl);
-        }, 1500);
+        }, 2000);
     } else {
         // In production, start backend and wait for it to be ready
         console.log("Production mode: Starting backend...");
@@ -565,14 +598,35 @@ app.on('activate', function () {
         const isDev = !app.isPackaged;
         if (isDev) {
             setTimeout(() => {
+                const checkUrl = (url) => {
+                    return new Promise((resolve) => {
+                        const req = http.get(url, (res) => {
+                            resolve(res.statusCode === 200);
+                        });
+                        req.on('error', () => resolve(false));
+                        req.setTimeout(1000, () => {
+                            req.destroy();
+                            resolve(false);
+                        });
+                    });
+                };
+                
                 const tryLoadUrl = async (url) => {
-                    try {
-                        await mainWindow.loadURL(url);
-                        return;
-                    } catch (e) {
-                        // Try alternative ports
-                        for (let port = 5173; port <= 5180; port++) {
-                            const altUrl = `http://127.0.0.1:${port}`;
+                    const isAccessible = await checkUrl(url);
+                    if (isAccessible) {
+                        try {
+                            await mainWindow.loadURL(url);
+                            return;
+                        } catch (e) {
+                            console.error(`Failed to load ${url}: ${e.message}`);
+                        }
+                    }
+                    
+                    // Try alternative ports
+                    for (let port = 5173; port <= 5180; port++) {
+                        const altUrl = `http://127.0.0.1:${port}`;
+                        const altAccessible = await checkUrl(altUrl);
+                        if (altAccessible) {
                             try {
                                 await mainWindow.loadURL(altUrl);
                                 return;
@@ -580,9 +634,9 @@ app.on('activate', function () {
                                 // Continue
                             }
                         }
-                        console.error("Failed to load dev URL, falling back to file");
-                        loadUI();
                     }
+                    console.error("Failed to load dev URL, falling back to file");
+                    loadUI();
                 };
                 tryLoadUrl(startUrl);
             }, 1000);

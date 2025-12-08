@@ -360,11 +360,11 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     }
                                 }}
                             >
-                                {/* Thumbnail placeholder */}
+                                {/* Thumbnail with annotation preview */}
                                 <div style={{
-                                    width: '40px',
-                                    height: '40px',
-                                    minWidth: '40px',
+                                    width: '50px',
+                                    height: '50px',
+                                    minWidth: '50px',
                                     background: 'rgba(255, 255, 255, 0.05)',
                                     borderRadius: '4px',
                                     marginRight: '8px',
@@ -372,7 +372,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     overflow: 'hidden',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    position: 'relative'
                                 }}>
                                     <img 
                                         src={img} 
@@ -387,6 +388,59 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             e.target.parentElement.innerHTML = '<div style="color: #666; font-size: 0.7rem;">IMG</div>';
                                         }}
                                     />
+                                    {/* Show annotation count badge */}
+                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && annotationCache.current[img].length > 0 && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '2px',
+                                            right: '2px',
+                                            background: 'rgba(0, 224, 255, 0.9)',
+                                            color: '#000',
+                                            borderRadius: '50%',
+                                            width: '16px',
+                                            height: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 'bold',
+                                            boxShadow: '0 0 4px rgba(0, 224, 255, 0.5)'
+                                        }}>
+                                            {annotationCache.current[img].length}
+                                        </div>
+                                    )}
+                                    {/* Draw annotation boxes on thumbnail */}
+                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            pointerEvents: 'none'
+                                        }}>
+                                            {annotationCache.current[img].slice(0, 3).map((ann, annIdx) => {
+                                                const cls = classes.find(c => c.id === ann.class_id);
+                                                if (!cls) return null;
+                                                // Scale annotation to thumbnail size (assuming image is loaded)
+                                                return (
+                                                    <div
+                                                        key={annIdx}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            left: `${(ann.x / 100) * 100}%`,
+                                                            top: `${(ann.y / 100) * 100}%`,
+                                                            width: `${(ann.width / 100) * 100}%`,
+                                                            height: `${(ann.height / 100) * 100}%`,
+                                                            border: `1px solid ${cls.color}`,
+                                                            background: `${cls.color}33`,
+                                                            boxShadow: `0 0 2px ${cls.color}`
+                                                        }}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{
@@ -421,8 +475,11 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                 <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('coco')}>
                     EXPORT COCO
                 </button>
-                <button className="btn-primary" style={{ width: '100%' }} onClick={() => onExport('voc')}>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('voc')}>
                     EXPORT VOC
+                </button>
+                <button className="btn-primary" style={{ width: '100%' }} onClick={() => onExport('report')}>
+                    EXPORT REPORT
                 </button>
             </div>
         </div>

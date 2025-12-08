@@ -394,6 +394,84 @@ def export_dataset_endpoint(data: ExportRequest):
     else:
         raise HTTPException(status_code=400, detail="Unknown format")
 
+class ReportRequest(BaseModel):
+    dataset_path: str
+
+@app.post("/export_report")
+def export_report_endpoint(data: ReportRequest):
+    """Export a quality report for the dataset"""
+    try:
+        import json
+        from datetime import datetime
+        
+        # Get annotated images
+        annotated_res = get_annotated_images(dataset_path=data.dataset_path, class_id=None)
+        annotated_images = set(annotated_res["annotated_images"])
+        
+        # Get all images
+        images_res = load_dataset(DatasetPath(path=data.dataset_path))
+        all_images = images_res["images"]
+        
+        # Load classes
+        classes_res = load_classes(DatasetPath(path=data.dataset_path))
+        classes = classes_res["classes"]
+        
+        # Count annotations per class
+        class_counts = {}
+        total_annotations = 0
+        invalid_annotations = 0
+        
+        for img_path in annotated_images:
+            try:
+                ann_res = load_annotation(
+                    dataset_path=data.dataset_path,
+                    image_path=img_path
+                )
+                boxes = ann_res["boxes"]
+                total_annotations += len(boxes)
+                
+                for box in boxes:
+                    class_id = box.get("class_id", 0)
+                    class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                    
+                    # Check for invalid
+                    if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:
+                        invalid_annotations += 1
+            except:
+                continue
+        
+        # Build report
+        report = {
+            "dataset_path": data.dataset_path,
+            "generated_at": datetime.now().isoformat(),
+            "summary": {
+                "total_images": len(all_images),
+                "annotated_images": len(annotated_images),
+                "unannotated_images": len(all_images) - len(annotated_images),
+                "completion_percentage": (len(annotated_images) / len(all_images) * 100) if all_images else 0,
+                "total_annotations": total_annotations,
+                "invalid_annotations": invalid_annotations,
+                "avg_annotations_per_image": total_annotations / len(annotated_images) if annotated_images else 0
+            },
+            "class_distribution": {
+                cls["name"]: class_counts.get(cls["id"], 0) for cls in classes
+            },
+            "quality_metrics": {
+                "invalid_annotation_rate": (invalid_annotations / total_annotations * 100) if total_annotations > 0 else 0,
+                "annotation_coverage": (len(annotated_images) / len(all_images) * 100) if all_images else 0
+            }
+        }
+        
+        # Save report
+        output_file = os.path.join(data.dataset_path, "quality_report.json")
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        
+        return {"status": "success", "file": output_file, "report": report}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     # Verify we can run this
