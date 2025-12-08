@@ -70,8 +70,7 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
     
     return (
         <div className="glass-panel" style={{ 
-            width: '250px', 
-            margin: '10px', 
+            width: '100%', 
             padding: '15px', 
             display: 'flex', 
             flexDirection: 'column',

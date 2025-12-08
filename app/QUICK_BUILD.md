@@ -46,6 +46,15 @@ Le fichier `.exe` fera environ **150-200 MB** car il inclut :
 
 C'est normal pour une application Electron !
 
+## Optimisations incluses
+
+L'application est optimisée pour les performances :
+- ✅ React.memo pour éviter les re-renders
+- ✅ useCallback pour mémoriser les fonctions
+- ✅ useMemo pour les calculs coûteux
+- ✅ Cache intelligent des annotations
+- ✅ Centrage automatique des images
+
 ## Dépannage
 
 **Erreur "dist not found"**
@@ -57,3 +66,5 @@ C'est normal pour une application Electron !
 **Build échoue**
 → Vérifiez que vous êtes dans le dossier `app/`
 
+**Performance lente en dev**
+→ Normal, utilisez `npm run build` puis `npm start` pour tester la version optimisée

@@ -20,15 +20,35 @@ try {
 
 Write-Host ""
 
-# Find the backend directory
+# Find the backend directory and requirements.txt
 $backendDir = $null
+$requirementsFile = $null
+
+# Try different locations
 if (Test-Path "resources\backend") {
     $backendDir = "resources\backend"
+    if (Test-Path "resources\requirements.txt") {
+        $requirementsFile = "resources\requirements.txt"
+    } elseif (Test-Path "resources\backend\requirements.txt") {
+        $requirementsFile = "resources\backend\requirements.txt"
+    }
 } elseif (Test-Path "win-unpacked\resources\backend") {
     $backendDir = "win-unpacked\resources\backend"
+    if (Test-Path "win-unpacked\resources\requirements.txt") {
+        $requirementsFile = "win-unpacked\resources\requirements.txt"
+    } elseif (Test-Path "win-unpacked\resources\backend\requirements.txt") {
+        $requirementsFile = "win-unpacked\resources\backend\requirements.txt"
+    }
 } elseif (Test-Path "backend") {
     $backendDir = "backend"
-} else {
+    if (Test-Path "requirements.txt") {
+        $requirementsFile = "requirements.txt"
+    } elseif (Test-Path "backend\requirements.txt") {
+        $requirementsFile = "backend\requirements.txt"
+    }
+}
+
+if ($null -eq $backendDir) {
     Write-Host "ERROR: Backend directory not found!" -ForegroundColor Red
     Write-Host "Please run this script from the release directory." -ForegroundColor Yellow
     Write-Host ""
@@ -36,35 +56,34 @@ if (Test-Path "resources\backend") {
     exit 1
 }
 
-Write-Host "Backend directory: $backendDir" -ForegroundColor Cyan
-Write-Host ""
-
-# Check if requirements.txt exists
-$requirementsPath = Join-Path $backendDir "requirements.txt"
-if (-not (Test-Path $requirementsPath)) {
-    Write-Host "ERROR: requirements.txt not found in $backendDir!" -ForegroundColor Red
+if ($null -eq $requirementsFile) {
+    Write-Host "ERROR: requirements.txt not found!" -ForegroundColor Red
+    Write-Host "Searched in:" -ForegroundColor Yellow
+    Write-Host "  - resources\requirements.txt"
+    Write-Host "  - resources\backend\requirements.txt"
+    Write-Host "  - win-unpacked\resources\requirements.txt"
+    Write-Host "  - win-unpacked\resources\backend\requirements.txt"
     Write-Host ""
     Read-Host "Press Enter to exit"
     exit 1
 }
 
+Write-Host "Backend directory: $backendDir" -ForegroundColor Cyan
+Write-Host "Requirements file: $requirementsFile" -ForegroundColor Cyan
+Write-Host ""
+
 Write-Host "Installing dependencies from requirements.txt..." -ForegroundColor Cyan
 Write-Host ""
 
-# Change to backend directory and install
-Push-Location $backendDir
-try {
-    python -m pip install -r requirements.txt
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host ""
-        Write-Host "ERROR: Failed to install dependencies!" -ForegroundColor Red
-        Write-Host "Try running: python -m pip install -r requirements.txt" -ForegroundColor Yellow
-        Write-Host ""
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-} finally {
-    Pop-Location
+# Install from the requirements file location
+python -m pip install -r $requirementsFile
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "ERROR: Failed to install dependencies!" -ForegroundColor Red
+    Write-Host "Try running: python -m pip install -r $requirementsFile" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+    exit 1
 }
 
 Write-Host ""

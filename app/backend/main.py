@@ -5,12 +5,47 @@ import os
 import glob
 import json
 import yaml
+import sys
+import io
 from typing import List
 from pydantic import BaseModel
 from PIL import Image
 
-from backend.models import DatasetPath, AnnotationData, ClassUpdate
-from backend.yolo_handler import parse_yolo_file, save_yolo_file
+# Handle imports for both module and direct execution
+import io
+
+# Fix encoding for Windows console (cp1252 doesn't support Unicode)
+# Force UTF-8 encoding for stdout/stderr
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'buffer') and sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except:
+        # If we can't change encoding, continue anyway
+        pass
+
+# Add current directory to Python path for direct execution
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+
+try:
+    from backend.models import DatasetPath, AnnotationData, ClassUpdate
+    from backend.yolo_handler import parse_yolo_file, save_yolo_file
+except ImportError:
+    # If running as script directly (packaged mode), use direct imports
+    try:
+        from models import DatasetPath, AnnotationData, ClassUpdate
+        from yolo_handler import parse_yolo_file, save_yolo_file
+    except ImportError as e:
+        print(f"[ERROR] Import error: {e}")
+        print(f"   Current directory: {os.getcwd()}")
+        print(f"   Script location: {__file__}")
+        print(f"   Backend dir: {_backend_dir}")
+        print(f"   Python path: {sys.path}")
+        raise
 
 app = FastAPI(title="Lama Worlds Annotation Studio Backend")
 
@@ -155,13 +190,17 @@ def get_annotated_images(dataset_path: str = Body(...), class_id: int = Body(Non
         if not os.path.exists(images_dir):
             images_dir = dataset_path
         
+        # Normalize dataset path for comparison
+        dataset_path_normalized = os.path.normpath(os.path.abspath(dataset_path))
+        
         for label_file in label_files:
             # Check if file is not empty
             if os.path.getsize(label_file) > 0:
                 # If filtering by class, check if file contains that class
                 if class_id is not None:
                     boxes = parse_yolo_file(label_file)
-                    has_class = any(box.get('class_id') == class_id for box in boxes)
+                    # Check if any box has the specified class_id
+                    has_class = any(int(box.get('class_id', -1)) == int(class_id) for box in boxes)
                     if not has_class:
                         continue
                 
@@ -171,10 +210,15 @@ def get_annotated_images(dataset_path: str = Body(...), class_id: int = Body(Non
                 for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.JPG', '.JPEG', '.PNG', '.BMP']:
                     image_path = os.path.join(images_dir, base_name + ext)
                     if os.path.exists(image_path):
-                        annotated_images.append(os.path.abspath(image_path))
+                        # Return absolute path, normalized (same format as load_dataset)
+                        abs_path = os.path.abspath(image_path)
+                        # Normalize path for consistency (same as load_dataset)
+                        if os.name == 'nt':  # Windows
+                            abs_path = abs_path.replace('/', '\\')
+                        annotated_images.append(abs_path)
                         break
         
-        return {"annotated_images": annotated_images}
+        return {"annotated_images": annotated_images, "count": len(annotated_images)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -367,7 +411,10 @@ async def import_yaml_classes(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error importing YAML: {str(e)}")
 
 # ... existing code ...
-from backend.exporter import export_coco, export_voc
+try:
+    from backend.exporter import export_coco, export_voc
+except ImportError:
+    from exporter import export_coco, export_voc
 
 class ExportRequest(BaseModel):
     dataset_path: str
@@ -472,8 +519,96 @@ def export_report_endpoint(data: ReportRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
+@app.post("/delete_image")
+def delete_image(dataset_path: str = Body(...), image_path: str = Body(...)):
+    """Delete an image and its corresponding annotation file"""
+    try:
+        if not dataset_path or not image_path:
+            raise HTTPException(status_code=400, detail="Dataset path and image path are required")
+        
+        # Determine full image path
+        if os.path.isabs(image_path):
+            image_full_path = image_path
+        else:
+            # Try images subdirectory first, then flat structure
+            image_full_path = os.path.join(dataset_path, "images", image_path)
+            if not os.path.exists(image_full_path):
+                image_full_path = os.path.join(dataset_path, image_path)
+        
+        # Verify image exists
+        if not os.path.exists(image_full_path):
+            raise HTTPException(status_code=404, detail=f"Image not found: {image_full_path}")
+        
+        # Determine label file path
+        base_name = os.path.splitext(os.path.basename(image_full_path))[0]
+        
+        if os.path.basename(os.path.dirname(image_full_path)) == "images":
+            label_dir = os.path.join(os.path.dirname(os.path.dirname(image_full_path)), "labels")
+        else:
+            label_dir = os.path.dirname(image_full_path)
+        
+        label_file = os.path.join(label_dir, base_name + ".txt")
+        
+        deleted_files = []
+        
+        # Delete image file
+        try:
+            os.remove(image_full_path)
+            deleted_files.append(image_full_path)
+        except Exception as e:
+            print(f"Warning: Could not delete image file {image_full_path}: {e}")
+        
+        # Delete annotation file if it exists
+        if os.path.exists(label_file):
+            try:
+                os.remove(label_file)
+                deleted_files.append(label_file)
+            except Exception as e:
+                print(f"Warning: Could not delete label file {label_file}: {e}")
+        
+        return {
+            "status": "deleted",
+            "image": image_full_path,
+            "label": label_file if os.path.exists(label_file) else None,
+            "deleted_files": deleted_files
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting image: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
+    import sys
+    import os
+    import io
+    
+    # Fix encoding for Windows console (cp1252 doesn't support Unicode)
+    # Force UTF-8 encoding for stdout/stderr
+    if sys.platform == 'win32':
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    
     # Verify we can run this
     print("Starting backend...")
+    print(f"Python version: {sys.version}")
+    print(f"Python executable: {sys.executable}")
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Script location: {__file__}")
+    print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
+    
+    # Check if required modules are available
+    try:
+        import fastapi
+        import uvicorn
+        import PIL
+        print("[OK] All required modules are available")
+    except ImportError as e:
+        print(f"[ERROR] Missing required module: {e}")
+        print("Please install dependencies: pip install -r requirements.txt")
+        sys.exit(1)
+    
     uvicorn.run(app, host="127.0.0.1", port=8000)

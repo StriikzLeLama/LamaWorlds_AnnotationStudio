@@ -71,6 +71,36 @@ Pour vérifier que tout est correctement installé :
 
 3. **Lancez l'application** et ouvrez un dataset
 
+## Fonctionnalités Incluses
+
+L'application inclut de nombreuses fonctionnalités avancées :
+
+### Annotation
+- ✅ Annotations rectangulaires (format YOLO)
+- ✅ Sélection multiple (drag rectangle, Ctrl+clic)
+- ✅ Duplication d'annotations (Ctrl+D)
+- ✅ Commentaires sur annotations
+- ✅ Validation automatique
+
+### Navigation
+- ✅ Navigation intelligente (prochaine image non annotée)
+- ✅ Historique de navigation (Alt+←/→)
+- ✅ Vue grille et liste
+- ✅ Recherche avancée
+
+### Gestion
+- ✅ Export/Import de projets complets
+- ✅ Pré-annotation YOLO
+- ✅ Templates de classes
+- ✅ Tags/métadonnées pour images
+- ✅ Statistiques détaillées
+
+### Performance
+- ✅ Optimisations React (memo, useCallback, useMemo)
+- ✅ Cache intelligent
+- ✅ Centrage automatique des images
+- ✅ Performance fluide même avec grandes datasets
+
 ## Dépannage
 
 ### Le backend ne démarre pas
@@ -92,10 +122,20 @@ Pour vérifier que tout est correctement installé :
 2. Redémarrez votre ordinateur
 3. Réinstallez l'application
 
+### Performance lente
+
+1. Fermez les autres applications
+2. Vérifiez que vous avez assez de RAM
+3. L'application utilise un cache intelligent pour optimiser les performances
+
 ## Support
 
 Pour plus d'aide, consultez :
 - `INSTALL_DEPENDENCIES.md` pour les détails techniques
+- `docs/README.md` pour la documentation complète
 - Les logs de l'application (console F12)
 - Les messages d'erreur dans l'interface
 
+## Raccourcis Clavier
+
+Appuyez sur `?` ou `F1` dans l'application pour voir tous les raccourcis clavier disponibles.

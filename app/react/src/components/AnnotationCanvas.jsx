@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize2, FlipHorizontal, FlipVertical } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize2, Minimize2, FlipHorizontal, FlipVertical, Eye, EyeOff } from 'lucide-react';
 
-const CanvasImage = ({ src, rotation = 0, flip = { horizontal: false, vertical: false } }) => {
+const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false, vertical: false }, onImageLoad }) => {
     const [image] = useImage(src);
+    
+    React.useEffect(() => {
+        if (image && onImageLoad) {
+            onImageLoad(image);
+        }
+    }, [image, onImageLoad]);
     
     if (!image) return null;
     
@@ -25,9 +31,9 @@ const CanvasImage = ({ src, rotation = 0, flip = { horizontal: false, vertical: 
             y={centerY}
         />
     );
-};
+});
 
-const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple }) => {
+const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple, showAnnotations = true, onZoomToSelection, isFullscreen = false, onToggleFullscreen }) => {
     const [stageScale, setStageScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
     const [newAnnotation, setNewAnnotation] = useState(null);
@@ -38,11 +44,13 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     const [imageFlip, setImageFlip] = useState({ horizontal: false, vertical: false });
     const [selectionBox, setSelectionBox] = useState(null);
     const [isSelecting, setIsSelecting] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
 
     const stageRef = useRef(null);
     const trRef = useRef(null);
     const layerRef = useRef(null);
     const containerRef = useRef(null);
+    const imageRef = useRef(null);
 
     // Update stage size on window resize
     useEffect(() => {
@@ -57,11 +65,11 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         return () => window.removeEventListener('resize', updateSize);
     }, []);
 
-    const getColor = (clsId) => {
+    const getColor = useCallback((clsId) => {
         if (!classes || !Array.isArray(classes)) return '#00e0ff';
         const cls = classes.find(c => c && c.id === clsId);
         return cls ? cls.color : '#00e0ff';
-    };
+    }, [classes]);
 
     const handleWheel = (e) => {
         e.evt.preventDefault();
@@ -388,51 +396,143 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
             }
         }
     }, [selectedId, selectedIds, annotations]);
+    
+    // Zoom to selection (smart zoom) - ONLY triggered by Z key or explicit event, NOT on click
+    useEffect(() => {
+        const handleZoomToSelection = () => {
+            if ((selectedId || (selectedIds && selectedIds.size > 0)) && showAnnotations && annotations.length > 0) {
+                const selectedAnn = annotations.find(a => a.id === selectedId || (selectedIds && selectedIds.has(a.id)));
+                if (selectedAnn && stageRef.current && containerRef.current) {
+                    const container = containerRef.current;
+                    const containerWidth = container.clientWidth;
+                    const containerHeight = container.clientHeight;
+                    
+                    // Calculate bounding box of selected annotation
+                    const padding = 50;
+                    const minX = selectedAnn.x;
+                    const minY = selectedAnn.y;
+                    const maxX = selectedAnn.x + selectedAnn.width;
+                    const maxY = selectedAnn.y + selectedAnn.height;
+                    
+                    const annWidth = maxX - minX;
+                    const annHeight = maxY - minY;
+                    
+                    if (annWidth > 0 && annHeight > 0) {
+                        // Calculate scale to fit annotation with padding
+                        const scaleX = (containerWidth - padding * 2) / annWidth;
+                        const scaleY = (containerHeight - padding * 2) / annHeight;
+                        const newScale = Math.min(scaleX, scaleY, 3); // Max zoom 3x
+                        
+                        // Center annotation
+                        const centerX = minX + annWidth / 2;
+                        const centerY = minY + annHeight / 2;
+                        
+                        setStageScale(newScale);
+                        setStagePos({
+                            x: containerWidth / 2 - centerX * newScale,
+                            y: containerHeight / 2 - centerY * newScale
+                        });
+                    }
+                }
+            }
+        };
+        
+        window.addEventListener('zoomToSelection', handleZoomToSelection);
+        return () => window.removeEventListener('zoomToSelection', handleZoomToSelection);
+    }, [selectedId, selectedIds, showAnnotations, annotations]);
+    
+    // Handle toggle annotations event
+    useEffect(() => {
+        const handleToggleAnnotations = () => {
+            // This is handled by parent component
+        };
+        window.addEventListener('toggleAnnotations', handleToggleAnnotations);
+        return () => window.removeEventListener('toggleAnnotations', handleToggleAnnotations);
+    }, []);
 
-    // Reset view when image changes
+    // Center image callback
+    const handleImageLoad = useCallback((image) => {
+        if (image && containerRef.current) {
+            imageRef.current = image;
+            const container = containerRef.current;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            if (image.width && image.height) {
+                // Center the image in the container
+                const centerX = containerWidth / 2;
+                const centerY = containerHeight / 2;
+                const imageCenterX = image.width / 2;
+                const imageCenterY = image.height / 2;
+                
+                setStagePos({
+                    x: centerX - imageCenterX,
+                    y: centerY - imageCenterY
+                });
+                setImageLoaded(true);
+            }
+        }
+    }, []);
+    
+    // Reset view and center image when image changes
     useEffect(() => {
         setStageScale(1);
-        setStagePos({ x: 0, y: 0 });
         setImageRotation(0);
         setImageFlip({ horizontal: false, vertical: false });
+        setImageLoaded(false);
+        setStagePos({ x: 0, y: 0 });
     }, [imageUrl]);
 
-    // Zoom functions
-    const zoomIn = () => {
+    // Zoom functions - memoized for performance
+    const zoomIn = useCallback(() => {
         setStageScale(prev => Math.min(5, prev * 1.2));
-    };
+    }, []);
 
-    const zoomOut = () => {
+    const zoomOut = useCallback(() => {
         setStageScale(prev => Math.max(0.1, prev / 1.2));
-    };
+    }, []);
 
-    const resetZoom = () => {
+    const resetZoom = useCallback(() => {
         setStageScale(1);
-        setStagePos({ x: 0, y: 0 });
-    };
+        if (containerRef.current && imageLoaded && imageRef.current) {
+            const container = containerRef.current;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            const img = imageRef.current;
+            
+            if (img.width && img.height) {
+                const centerX = containerWidth / 2;
+                const centerY = containerHeight / 2;
+                const imageCenterX = img.width / 2;
+                const imageCenterY = img.height / 2;
+                
+                setStagePos({
+                    x: centerX - imageCenterX,
+                    y: centerY - imageCenterY
+                });
+            } else {
+                setStagePos({ x: 0, y: 0 });
+            }
+        } else {
+            setStagePos({ x: 0, y: 0 });
+        }
+    }, [imageLoaded]);
 
-    const fitToScreen = () => {
-        if (!imageUrl || !containerRef.current) return;
-        const container = containerRef.current;
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        
-        // Get image dimensions (would need to load image first)
-        // For now, just reset
+    const fitToScreen = useCallback(() => {
         resetZoom();
-    };
+    }, [resetZoom]);
 
-    const rotateImage = (direction) => {
+    const rotateImage = useCallback((direction) => {
         setImageRotation(prev => (prev + (direction === 'cw' ? 90 : -90)) % 360);
-    };
+    }, []);
 
-    const flipImage = (axis) => {
+    const flipImage = useCallback((axis) => {
         if (axis === 'horizontal') {
             setImageFlip(prev => ({ ...prev, horizontal: !prev.horizontal }));
         } else {
             setImageFlip(prev => ({ ...prev, vertical: !prev.vertical }));
         }
-    };
+    }, []);
 
     if (!imageUrl) {
         return (
@@ -506,6 +606,47 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                     title="Reset Zoom (Ctrl 0)"
                 >
                     100%
+                </button>
+                <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.2)', margin: '4px 0' }} />
+                <button
+                    onClick={() => {
+                        if (onToggleFullscreen) onToggleFullscreen();
+                    }}
+                    style={{
+                        background: isFullscreen ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.2)',
+                        border: '1px solid rgba(0, 224, 255, 0.5)',
+                        color: '#00e0ff',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                    title="Toggle Fullscreen (F11)"
+                >
+                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+                <button
+                    onClick={() => {
+                        // Toggle annotations visibility - this will be handled by parent
+                        const event = new CustomEvent('toggleAnnotations');
+                        window.dispatchEvent(event);
+                    }}
+                    style={{
+                        background: showAnnotations ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(0, 224, 255, 0.5)',
+                        color: showAnnotations ? '#00e0ff' : '#666',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                    title="Toggle Annotations (T)"
+                >
+                    {showAnnotations ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
                 <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.2)', margin: '4px 0' }} />
                 <button
@@ -609,9 +750,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 ref={stageRef}
             >
                 <Layer ref={layerRef}>
-                    <CanvasImage src={imageUrl} rotation={imageRotation} flip={imageFlip} />
+                    <CanvasImage src={imageUrl} rotation={imageRotation} flip={imageFlip} onImageLoad={handleImageLoad} />
 
-                    {annotations.map((ann, i) => {
+                    {showAnnotations && annotations.map((ann) => {
                         const isSelected = selectedId === ann.id || (selectedIds && selectedIds.has(ann.id));
                         return (
                             <Rect

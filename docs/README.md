@@ -10,36 +10,61 @@ Un outil d'annotation d'images moderne et puissant pour les datasets YOLO, avec 
 
 ### 🎨 Interface Moderne
 - **Interface sombre** avec design néon futuriste
-- **Canvas interactif** avec zoom, pan et dessin fluide
-- **Miniatures d'images** pour navigation rapide
+- **Canvas interactif** avec zoom, pan, rotation et flip
+- **Miniatures d'images** avec aperçu des annotations
+- **Vue grille et liste** pour navigation rapide
+- **Mode plein écran** pour focus maximal
 - **Barre de progression** pour suivre votre travail
 - **Panel de statistiques** en temps réel
+- **Panneau de validation** intégré
 
 ### 📝 Annotation Avancée
 - **Annotations rectangulaires** (format YOLO)
 - **Système de classes** personnalisables avec couleurs
-- **Annuler/Refaire** (Ctrl+Z / Ctrl+Y)
-- **Copier/Coller** d'annotations (Ctrl+C / Ctrl+V)
-- **Sélection multiple** pour opérations en lot
-- **Validation automatique** des annotations
+- **Sélection multiple** avec drag rectangle et Ctrl+clic
+- **Opérations en lot** (supprimer toutes les annotations d'une classe)
+- **Duplication d'annotations** (Ctrl+D)
+- **Commentaires sur annotations** pour notes personnelles
+- **Validation automatique** des annotations (erreurs, warnings, doublons)
+- **Pré-annotation YOLO** avec modèle personnalisé
+- **Zoom intelligent** sur sélection (touche Z)
 
 ### 🔍 Navigation & Recherche
 - **Recherche d'images** en temps réel
-- **Filtres** : Toutes / Annotées / Vides
-- **Navigation clavier** (flèches gauche/droite)
-- **Raccourcis clavier** complets
+- **Recherche dans annotations** (classes, commentaires, tags)
+- **Filtres avancés** : Toutes / Annotées / Vides / Par classe
+- **Navigation intelligente** : prochaine image non annotée (N)
+- **Historique de navigation** (Alt+←/→)
+- **Navigation clavier** complète (flèches, Home/End)
+- **Raccourcis clavier** complets et personnalisables
 
 ### 💾 Gestion de Projet
 - **Sauvegarde automatique** de l'état
 - **Restauration** au redémarrage
+- **Export/Import de projets complets** (backup/restore)
 - **Import YAML** des classes (format YOLO)
 - **Export COCO** et **Pascal VOC**
+- **Templates de classes** (sauvegarde/chargement)
+- **Tags/métadonnées** pour images
 - **Cache intelligent** pour performance optimale
+- **Historique par image** des modifications
 
-### 🚀 Performance
+### 🚀 Performance & Qualité
+- **Optimisations avancées** (React.memo, useCallback, useMemo)
+- **Centrage automatique** des images au chargement
 - **Lazy loading** des images
 - **Cache des annotations**
-- **Optimisations** pour grandes datasets
+- **Validation de qualité** en temps réel
+- **Rapports statistiques** détaillés
+- **Performance fluide** même avec grandes datasets
+
+### 🎯 Fonctionnalités Spéciales
+- **Pré-annotation avec YOLO** : Chargez un modèle YOLO pour pré-annoter automatiquement
+- **Mode plein écran** : Focus total sur l'annotation (F11)
+- **Vue grille** : Navigation visuelle rapide avec aperçu des annotations
+- **Statistiques détaillées** : Progression du dataset, annotations par classe, moyennes
+- **Validation automatique** : Détection d'erreurs, warnings et doublons
+- **Export de rapports** : Statistiques complètes du dataset
 
 ## 📋 Prérequis
 
@@ -109,7 +134,7 @@ npm run build:win
 Le fichier `.exe` sera créé dans le dossier `release/` :
 - `Lama Worlds Annotation Studio-1.0.0-Setup.exe`
 
-> 📖 Pour plus de détails, consultez [BUILD.md](./BUILD.md) ou [QUICK_BUILD.md](./QUICK_BUILD.md)
+> 📖 Pour plus de détails, consultez [BUILD.md](../app/BUILD.md) ou [QUICK_BUILD.md](../app/QUICK_BUILD.md)
 
 ## 🎯 Guide d'utilisation
 
@@ -131,23 +156,102 @@ Le fichier `.exe` sera créé dans le dossier `release/` :
 ### Modifier une Annotation
 
 - **Cliquer** sur une annotation pour la sélectionner
+- **Ctrl+Clic** pour sélection multiple
+- **Drag rectangle** pour sélection multiple
 - **Glisser** pour déplacer
 - **Redimensionner** avec les poignées
-- **Changer la classe** via le menu déroulant dans le panneau de droite
+- **Changer la classe** avec les touches 1-9 ou via le menu
+- **Dupliquer** avec Ctrl+D
 - **Supprimer** avec la touche `Delete` ou le bouton ×
+- **Ajouter un commentaire** via le panneau de droite
 
-### Raccourcis Clavier
+### Pré-annotation YOLO
 
+1. Dans la sidebar, section **"YOLO Pre-annotation"**
+2. Entrez le chemin vers votre modèle YOLO (.pt ou .onnx)
+3. Définissez le seuil de confiance (0.0 - 1.0)
+4. Cliquez sur **"Load Model"** puis **"Pre-annotate"**
+5. Les annotations seront générées automatiquement
+
+### Navigation Intelligente
+
+- **N** : Prochaine image non annotée
+- **Shift+N** : Image précédente non annotée
+- **Alt+←** : Retour dans l'historique
+- **Alt+→** : Avancer dans l'historique
+- **Home/End** : Première/Dernière image
+
+### Raccourcis Clavier Complets
+
+#### Navigation
+| Raccourci | Action |
+|-----------|--------|
+| `←` / `→` | Naviguer entre les images |
+| `Home` / `End` | Aller à la première/dernière image |
+| `N` | Prochaine image non annotée |
+| `Shift+N` | Image précédente non annotée |
+| `Alt+←` / `Alt+→` | Historique de navigation (retour/avancer) |
+
+#### Annotation
+| Raccourci | Action |
+|-----------|--------|
+| `Click & Drag` | Dessiner une nouvelle annotation |
+| `Click` | Sélectionner une annotation |
+| `Ctrl+Click` | Sélection multiple |
+| `Drag Rectangle` | Sélection multiple par zone |
+| `Ctrl+A` | Sélectionner toutes les annotations |
+| `Delete` / `Backspace` | Supprimer l'annotation sélectionnée |
+| `1-9` | Changer la classe de l'annotation sélectionnée |
+| `Ctrl+D` | Dupliquer l'annotation sélectionnée |
+| `T` | Masquer/Afficher les annotations |
+| `Z` | Zoom intelligent sur sélection |
+
+#### Édition
 | Raccourci | Action |
 |-----------|--------|
 | `Ctrl+Z` | Annuler |
 | `Ctrl+Y` | Refaire |
 | `Ctrl+C` | Copier l'annotation sélectionnée |
 | `Ctrl+V` | Coller l'annotation |
-| `Delete` / `Backspace` | Supprimer l'annotation sélectionnée |
-| `←` / `→` | Naviguer entre les images |
+
+#### Canvas
+| Raccourci | Action |
+|-----------|--------|
+| `Ctrl + / -` | Zoom avant/arrière |
+| `Ctrl+0` | Réinitialiser le zoom |
 | `Molette` | Zoomer |
-| `Shift+Clic` / `Clic molette` | Pan (déplacer la vue) |
+| `Middle Click` / `Shift+Drag` | Pan (déplacer la vue) |
+| `R` | Rotation horaire |
+| `Shift+R` | Rotation anti-horaire |
+| `H` | Retourner horizontalement |
+| `V` | Retourner verticalement |
+| `F11` | Mode plein écran |
+
+#### Aide
+| Raccourci | Action |
+|-----------|--------|
+| `?` / `F1` | Afficher/Masquer l'aide des raccourcis |
+
+### Gestion des Classes
+
+- **Ajouter une classe** : Cliquez sur "+" dans la sidebar
+- **Modifier une classe** : Double-cliquez sur le nom
+- **Changer la couleur** : Cliquez sur le carré de couleur
+- **Supprimer une classe** : Cliquez sur × (supprime aussi toutes ses annotations)
+- **Importer depuis YAML** : Bouton "Import YAML"
+- **Sauvegarder template** : Bouton "Save Template"
+- **Charger template** : Bouton "Load Template"
+
+### Tags et Métadonnées
+
+- **Ajouter des tags** : Cliquez sur l'icône tag dans la liste d'images
+- **Rechercher par tag** : Utilisez la recherche avec "tag:nom_du_tag"
+- **Tags multiples** : Séparez par des virgules
+
+### Export/Import de Projet
+
+- **Export complet** : Menu → Export Project (sauvegarde tout : images, annotations, classes, tags, commentaires)
+- **Import complet** : Menu → Import Project (restaure un projet complet)
 
 ### Importer des Classes depuis YAML
 
@@ -159,6 +263,15 @@ Le fichier `.exe` sera créé dans le dossier `release/` :
 
 1. Cliquez sur **"EXPORT COCO"** ou **"EXPORT VOC"** dans le panneau de droite
 2. Le fichier sera créé dans le dossier du dataset
+
+### Export de Rapports Statistiques
+
+1. Cliquez sur **"Export Report"** dans le panneau de statistiques
+2. Un rapport détaillé sera généré avec :
+   - Progression du dataset
+   - Statistiques par classe
+   - Images annotées/non annotées
+   - Moyennes et totaux
 
 ## 📁 Structure du Dataset
 
@@ -200,7 +313,14 @@ app/
 │   └── src/
 │       ├── App.jsx
 │       ├── components/
+│       │   ├── AnnotationCanvas.jsx
+│       │   ├── Sidebar.jsx
+│       │   ├── RightPanel.jsx
+│       │   ├── StatsPanel.jsx
+│       │   ├── ValidationPanel.jsx
+│       │   └── KeyboardShortcuts.jsx
 │       └── hooks/
+│           └── useUndoRedo.js
 ├── dist/           # Build React (généré)
 └── release/        # Build Electron (généré)
 ```
@@ -211,6 +331,7 @@ app/
 - **Backend** : FastAPI, Python 3.10+
 - **Desktop** : Electron 28
 - **Styling** : CSS moderne avec effets glassmorphism
+- **Performance** : React.memo, useCallback, useMemo pour optimisations
 
 ## 📝 Scripts Disponibles
 
@@ -246,6 +367,12 @@ app/
 - Assurez-vous d'avoir exécuté `npm run build` avant `npm run build:win`
 - Vérifiez que tous les fichiers sont présents
 
+### Performance lente
+
+- L'application est optimisée pour de grandes datasets
+- Utilisez le cache des annotations (activé par défaut)
+- Fermez les autres applications pour libérer de la mémoire
+
 ## 🤝 Contribution
 
 Les contributions sont les bienvenues ! N'hésitez pas à :
@@ -276,4 +403,3 @@ Pour toute question ou problème :
 ---
 
 **Fait avec ❤️ pour la communauté ML/AI**
-

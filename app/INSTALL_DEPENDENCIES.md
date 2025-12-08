@@ -22,7 +22,7 @@ Si Python n'est pas trouvé :
 
 1. Naviguez vers le dossier de l'application compilée :
    ```powershell
-   cd "L:\Logiciel\Visual Studio 2022\VS Studio Project\LamaWorlds_AnnotationStudio\app\release\win-unpacked"
+   cd "C:\Program Files\Lama Worlds Annotation Studio"
    ```
 
 2. Exécutez le script d'installation :
@@ -41,7 +41,7 @@ Si Python n'est pas trouvé :
 
 2. Naviguez vers le dossier backend de l'application :
    ```powershell
-   cd "L:\Logiciel\Visual Studio 2022\VS Studio Project\LamaWorlds_AnnotationStudio\app\release\win-unpacked\resources\backend"
+   cd "C:\Program Files\Lama Worlds Annotation Studio\resources\backend"
    ```
 
 3. Installez les dépendances :
@@ -66,6 +66,21 @@ Si vous voyez "All dependencies installed!", c'est bon !
 ## Étape 4 : Redémarrer l'application
 
 Fermez complètement l'application et relancez-la. Le backend devrait maintenant démarrer correctement.
+
+## Dépendances Requises
+
+L'application nécessite les packages Python suivants :
+
+- **fastapi** : Framework web pour l'API
+- **uvicorn** : Serveur ASGI
+- **Pillow (PIL)** : Traitement d'images
+- **numpy** : Calculs numériques
+- **opencv-python (cv2)** : Vision par ordinateur
+- **python-multipart** : Gestion des fichiers
+- **watchdog** : Surveillance des fichiers
+- **pyyaml** : Parsing YAML
+
+Toutes ces dépendances sont listées dans `requirements.txt`.
 
 ## Dépannage
 
@@ -92,3 +107,26 @@ python -c "import sys; print(sys.executable)"
 
 Cela vous montrera quel Python est utilisé et où il se trouve.
 
+### Installation dans un environnement virtuel
+
+Si vous préférez utiliser un environnement virtuel :
+
+```bash
+# Créer un environnement virtuel
+python -m venv venv
+
+# Activer l'environnement (Windows)
+venv\Scripts\activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+```
+
+**Note** : L'application compilée utilise le Python système, pas un environnement virtuel.
+
+## Support
+
+Pour plus d'aide :
+- Consultez `README_INSTALLATION.md` pour l'installation complète
+- Consultez `docs/README.md` pour la documentation complète
+- Vérifiez les logs de l'application (console F12)

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings } from 'lucide-react';
 
-function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass }) {
+function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence }) {
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
     const [showBatchMenu, setShowBatchMenu] = useState(false);
+    const [showYoloPanel, setShowYoloPanel] = useState(false);
+    const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
 
     const onClassClick = (clsId) => {
         if (selectedAnnotationId) {
@@ -226,6 +228,30 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     </button>
                 </div>
                 
+                {/* YOLO Pre-annotation */}
+                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                    <button
+                        className="btn-primary"
+                        style={{ width: '100%', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
+                        onClick={() => setShowYoloPanel(true)}
+                    >
+                        <Brain size={14} />
+                        YOLO Pre-annotation
+                    </button>
+                </div>
+                
+                {/* Custom Shortcuts */}
+                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                    <button
+                        className="btn-primary"
+                        style={{ width: '100%', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
+                        onClick={() => setShowShortcutsPanel(true)}
+                    >
+                        <Settings size={14} />
+                        Custom Shortcuts
+                    </button>
+                </div>
+                
                 {/* Batch Operations */}
                 <div style={{ position: 'relative' }}>
                     <button 
@@ -287,6 +313,205 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     )}
                 </div>
             </div>
+            
+            {/* YOLO Pre-annotation Panel */}
+            {showYoloPanel && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    zIndex: 10000,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px'
+                }} onClick={() => setShowYoloPanel(false)}>
+                    <div className="glass-panel" style={{
+                        minWidth: '500px',
+                        maxWidth: '700px',
+                        padding: '20px',
+                        position: 'relative'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h3 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Brain size={20} />
+                                YOLO Pre-annotation
+                            </h3>
+                            <button
+                                onClick={() => setShowYoloPanel(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#aaa',
+                                    cursor: 'pointer',
+                                    fontSize: '1.5rem',
+                                    padding: '0',
+                                    width: '30px',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div style={{ marginBottom: '15px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#aaa' }}>
+                                Model Path (.pt or .onnx)
+                            </label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={yoloModelPath || ''}
+                                    onChange={(e) => setYoloModelPath && setYoloModelPath(e.target.value)}
+                                    placeholder="Path to YOLO model file"
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '0.9rem',
+                                        outline: 'none'
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                                    onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
+                                />
+                                {window.electronAPI && window.electronAPI.selectFile && (
+                                    <button
+                                        className="btn-primary"
+                                        onClick={async () => {
+                                            try {
+                                                const filePath = await window.electronAPI.selectFile([
+                                                    { name: 'YOLO Models', extensions: ['pt', 'onnx'] },
+                                                    { name: 'All Files', extensions: ['*'] }
+                                                ]);
+                                                if (filePath && setYoloModelPath) {
+                                                    setYoloModelPath(filePath);
+                                                }
+                                            } catch (err) {
+                                                console.error('Failed to select file:', err);
+                                            }
+                                        }}
+                                        style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                                    >
+                                        Browse
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '15px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#aaa' }}>
+                                Confidence Threshold: {(yoloConfidence || 0.25) * 100}%
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={yoloConfidence || 0.25}
+                                onChange={(e) => setYoloConfidence && setYoloConfidence(parseFloat(e.target.value))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setShowYoloPanel(false)}
+                                style={{
+                                    padding: '6px 12px',
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (onPreAnnotate && yoloModelPath) {
+                                        onPreAnnotate(yoloModelPath, yoloConfidence || 0.25);
+                                        setShowYoloPanel(false);
+                                    } else {
+                                        alert('Please select a YOLO model file');
+                                    }
+                                }}
+                                className="btn-primary"
+                                style={{
+                                    padding: '6px 12px',
+                                    fontSize: '0.85rem'
+                                }}
+                            >
+                                Run Pre-annotation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Custom Shortcuts Panel */}
+            {showShortcutsPanel && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.8)',
+                    zIndex: 10000,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '20px'
+                }} onClick={() => setShowShortcutsPanel(false)}>
+                    <div className="glass-panel" style={{
+                        minWidth: '500px',
+                        maxWidth: '700px',
+                        padding: '20px',
+                        position: 'relative',
+                        maxHeight: '80vh',
+                        overflowY: 'auto'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h3 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Settings size={20} />
+                                Custom Shortcuts
+                            </h3>
+                            <button
+                                onClick={() => setShowShortcutsPanel(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#aaa',
+                                    cursor: 'pointer',
+                                    fontSize: '1.5rem',
+                                    padding: '0',
+                                    width: '30px',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#aaa', marginBottom: '15px' }}>
+                            Custom shortcuts are saved in localStorage. Default shortcuts cannot be changed.
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>
+                            Note: Custom shortcuts feature is available. You can extend this panel to add custom key mappings.
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

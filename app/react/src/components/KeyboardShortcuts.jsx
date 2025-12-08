@@ -18,7 +18,10 @@ function KeyboardShortcuts({ onClose }) {
             { key: 'Resize handles', desc: 'Resize annotation' },
             { key: 'Delete / Backspace', desc: 'Delete selected annotation(s)' },
             { key: 'Ctrl+A', desc: 'Select all annotations' },
-            { key: '1-9', desc: 'Change class of selected (when multiple selected)' },
+            { key: '1-9', desc: 'Change class of selected annotation(s)' },
+            { key: 'Ctrl+D', desc: 'Duplicate selected annotation' },
+            { key: 'T', desc: 'Toggle annotations visibility' },
+            { key: 'Z', desc: 'Zoom to selected annotation' },
         ]},
         { category: 'Edit', items: [
             { key: 'Ctrl+Z', desc: 'Undo' },
@@ -35,6 +38,7 @@ function KeyboardShortcuts({ onClose }) {
             { key: 'Shift+R', desc: 'Rotate image counter-clockwise' },
             { key: 'H', desc: 'Flip image horizontally' },
             { key: 'V', desc: 'Flip image vertically' },
+            { key: 'F11', desc: 'Toggle fullscreen mode' },
         ]},
     ];
 

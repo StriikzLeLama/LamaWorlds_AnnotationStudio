@@ -104,8 +104,7 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
     if (issues.length === 0 && !validating) {
         return (
             <div className="glass-panel" style={{
-                width: '250px',
-                margin: '10px',
+                width: '100%',
                 padding: '15px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -124,8 +123,7 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
 
     return (
         <div className="glass-panel" style={{
-            width: '250px',
-            margin: '10px',
+            width: '100%',
             padding: '15px',
             display: 'flex',
             flexDirection: 'column',

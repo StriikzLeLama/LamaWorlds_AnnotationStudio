@@ -47,6 +47,33 @@ L'utilisateur doit avoir :
 - Python 3.10+ installé
 - Les dépendances Python installées : `pip install -r requirements.txt`
 
+### Mode Développement (Recommandé)
+
+Pour éviter les problèmes de détection de Python en mode build, vous pouvez utiliser le mode développement :
+
+```bash
+npm run dev
+```
+
+Cette commande démarre automatiquement :
+- Le backend Python (FastAPI) sur le port 8000
+- Le serveur Vite (React) sur le port 5173
+- L'application Electron
+
+**Avantages du mode dev :**
+- ✅ Détection Python automatique et fiable
+- ✅ Hot-reload pour le développement
+- ✅ Logs détaillés en temps réel
+- ✅ Pas de problème de PATH
+- ✅ Performance optimale avec optimisations React
+
+### Mode Production (Build)
+
+Pour créer un .exe, suivez les étapes ci-dessus, mais notez que :
+- L'utilisateur final doit avoir Python installé
+- Les dépendances doivent être installées avec `install-backend-deps.bat`
+- La détection de Python peut être problématique selon l'environnement
+
 ### Option 1 : Installer Python automatiquement
 
 Pour inclure Python dans l'installateur, vous pouvez utiliser un script d'installation personnalisé.
@@ -68,6 +95,7 @@ release/
 - Le build inclut le backend Python mais **pas** l'interpréteur Python
 - L'utilisateur final doit installer Python séparément
 - Pour un build autonome, considérez PyInstaller pour le backend
+- L'application est optimisée pour les performances avec React.memo, useCallback et useMemo
 
 ## Dépannage
 
@@ -110,3 +138,12 @@ Si vous obtenez une erreur réseau ("Network Error" ou "ECONNREFUSED") dans l'ap
    - Le backend utilise le port 8000 par défaut
    - Assurez-vous qu'aucune autre application n'utilise ce port
 
+## Optimisations incluses
+
+L'application inclut plusieurs optimisations de performance :
+- **React.memo** pour éviter les re-renders inutiles
+- **useCallback** pour mémoriser les fonctions
+- **useMemo** pour mémoriser les calculs coûteux
+- **Cache intelligent** des annotations
+- **Lazy loading** des images
+- **Centrage automatique** des images pour meilleure UX
