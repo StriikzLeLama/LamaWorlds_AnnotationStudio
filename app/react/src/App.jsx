@@ -234,20 +234,57 @@ function App() {
         }
     }, [datasetPath, currentImageIndex, selectedClassId, saveState]);
 
-    // Define saveAnnotations first using useCallback
-    const saveAnnotations = useCallback(async (newAnnotations, addToHistory = true) => {
-        if (currentImageIndex < 0 || currentImageIndex >= images.length || !datasetPath || !images[currentImageIndex]) return;
+    // Debounce timer for auto-save
+    const saveDebounceTimer = useRef(null);
+    
+    // Define saveAnnotations first using useCallback with debouncing
+    const saveAnnotations = useCallback(async (newAnnotations, addToHistory = true, immediate = false) => {
+        // Validate inputs
+        if (!Array.isArray(newAnnotations)) {
+            console.error('saveAnnotations: newAnnotations must be an array');
+            return;
+        }
+        
+        if (currentImageIndex < 0 || !Array.isArray(images) || currentImageIndex >= images.length || !datasetPath || !images[currentImageIndex]) {
+            console.warn('saveAnnotations: Invalid state, skipping save');
+            return;
+        }
+        
+        // Validate annotations before saving
+        const validAnnotations = newAnnotations.filter(ann => {
+            if (!ann || typeof ann !== 'object') return false;
+            // Check required fields
+            if (typeof ann.x !== 'number' || typeof ann.y !== 'number' || 
+                typeof ann.width !== 'number' || typeof ann.height !== 'number' ||
+                typeof ann.class_id !== 'number') {
+                console.warn('Invalid annotation format:', ann);
+                return false;
+            }
+            // Check for valid values
+            if (isNaN(ann.x) || isNaN(ann.y) || isNaN(ann.width) || isNaN(ann.height) || isNaN(ann.class_id)) {
+                console.warn('Annotation contains NaN values:', ann);
+                return false;
+            }
+            return true;
+        });
+        
+        // Update state immediately for UI responsiveness
+        setAnnotations(validAnnotations);
+        const currentImagePath = images[currentImageIndex];
+        if (annotationCache && annotationCache.current && currentImagePath) {
+            annotationCache.current[currentImagePath] = validAnnotations;
+        }
         
         // Add to undo history
-        if (addToHistory) {
+        if (addToHistory && Array.isArray(annotations)) {
             setUndoRedoState(annotations);
         }
         
         // Add to image history
-        const currentImagePath = images[currentImageIndex];
-        if (currentImagePath && addToHistory) {
+        if (currentImagePath && addToHistory && Array.isArray(annotations)) {
             setImageHistory(prev => {
-                const imageHist = prev[currentImagePath] || [];
+                if (!prev || typeof prev !== 'object') prev = {};
+                const imageHist = Array.isArray(prev[currentImagePath]) ? prev[currentImagePath] : [];
                 return {
                     ...prev,
                     [currentImagePath]: [
@@ -262,56 +299,77 @@ function App() {
             });
         }
         
-        setSaveStatus('Saving...');
-        try {
-            if (!currentImagePath) {
-                console.error('No image path available for saving');
-                setSaveStatus('Error');
-                return;
-            }
-            
-            await api.post('/save_annotation', {
-                image_name: currentImagePath,
-                dataset_path: datasetPath,
-                boxes: newAnnotations
-            });
-            setAnnotations(newAnnotations);
-            // Cache annotations
-            annotationCache.current[currentImagePath] = newAnnotations;
-            
-            // Update annotated images set
-            setAnnotatedImages(prev => {
-                const newSet = new Set(prev);
-                if (newAnnotations.length > 0) {
-                    newSet.add(currentImagePath);
-                } else {
-                    newSet.delete(currentImagePath);
-                }
-                return newSet;
-            });
-            
-            // Auto-save to history
-            try {
-                const autoSaveEntry = {
-                    timestamp: Date.now(),
-                    datasetPath,
-                    currentImageIndex,
-                    imageCount: images.length,
-                    annotationCount: newAnnotations.length
-                };
-                setAutoSaveHistory(prev => [...prev, autoSaveEntry].slice(-50)); // Keep last 50
-                localStorage.setItem('autoSaveHistory', JSON.stringify([...autoSaveHistory, autoSaveEntry].slice(-50)));
-            } catch (err) {
-                console.error('Failed to save auto-save history:', err);
-            }
-            
-            setTimeout(() => setSaveStatus('Saved'), 500);
-        } catch (err) {
-            console.error("Failed to save", err);
-            setSaveStatus('Error');
-            setTimeout(() => setSaveStatus('Saved'), 2000);
+        // Clear previous debounce timer
+        if (saveDebounceTimer.current) {
+            clearTimeout(saveDebounceTimer.current);
         }
-    }, [currentImageIndex, images, datasetPath, annotations, setUndoRedoState]);
+        
+        // Debounced save function
+        const performSave = async () => {
+            setSaveStatus('Saving...');
+            try {
+                if (!currentImagePath) {
+                    console.error('No image path available for saving');
+                    setSaveStatus('Error');
+                    return;
+                }
+                
+                await api.post('/save_annotation', {
+                    image_name: currentImagePath,
+                    dataset_path: datasetPath,
+                    boxes: validAnnotations
+                });
+                
+                // Update annotated images set
+                setAnnotatedImages(prev => {
+                    const newSet = new Set(prev);
+                    if (validAnnotations.length > 0) {
+                        newSet.add(currentImagePath);
+                    } else {
+                        newSet.delete(currentImagePath);
+                    }
+                    return newSet;
+                });
+                
+                // Auto-save to history
+                try {
+                    const autoSaveEntry = {
+                        timestamp: Date.now(),
+                        datasetPath,
+                        currentImageIndex,
+                        imageCount: Array.isArray(images) ? images.length : 0,
+                        annotationCount: validAnnotations.length
+                    };
+                    setAutoSaveHistory(prev => {
+                        const prevArray = Array.isArray(prev) ? prev : [];
+                        return [...prevArray, autoSaveEntry].slice(-50);
+                    });
+                    try {
+                        localStorage.setItem('autoSaveHistory', JSON.stringify([...autoSaveHistory, autoSaveEntry].slice(-50)));
+                    } catch (storageErr) {
+                        console.warn('Failed to save to localStorage:', storageErr);
+                    }
+                } catch (err) {
+                    console.error('Failed to save auto-save history:', err);
+                }
+                
+                setSaveStatus('Saved');
+            } catch (err) {
+                console.error("Failed to save", err);
+                setSaveStatus('Error');
+                setTimeout(() => setSaveStatus('Saved'), 2000);
+            }
+        };
+        
+        // Save immediately or debounce
+        if (immediate) {
+            await performSave();
+        } else {
+            // Debounce save by 500ms for better performance
+            saveDebounceTimer.current = setTimeout(performSave, 500);
+            setSaveStatus('Saving...');
+        }
+    }, [currentImageIndex, images, datasetPath, annotations, setUndoRedoState, autoSaveHistory]);
     
     // Undo/Redo handlers
     const handleUndo = useCallback(() => {
@@ -332,27 +390,64 @@ function App() {
         }
     }, [canRedo, redo, saveAnnotations]);
     
-    // Copy/Paste annotations
+    // Copy/Paste annotations - Enhanced to support multiple annotations
+    const [copiedAnnotations, setCopiedAnnotations] = useState([]); // Support multiple copied annotations
+    
     const copyAnnotation = useCallback(() => {
-        if (selectedAnnotationId) {
-            const ann = annotations.find(a => a.id === selectedAnnotationId);
-            if (ann) {
+        if (!Array.isArray(annotations)) return;
+        
+        // Copy multiple if selected, otherwise copy single
+        if (selectedAnnotationIds && selectedAnnotationIds.size > 0) {
+            const annsToCopy = annotations.filter(a => a && a.id && selectedAnnotationIds.has(a.id));
+            if (annsToCopy.length > 0) {
+                setCopiedAnnotations(annsToCopy);
+                setCopiedAnnotation(annsToCopy[0]); // Keep for backward compatibility
+            }
+        } else if (selectedAnnotationId) {
+            const ann = annotations.find(a => a && a.id === selectedAnnotationId);
+            if (ann && typeof ann === 'object') {
+                setCopiedAnnotations([ann]);
                 setCopiedAnnotation(ann);
             }
         }
-    }, [selectedAnnotationId, annotations]);
+    }, [selectedAnnotationId, selectedAnnotationIds, annotations]);
     
     const pasteAnnotation = useCallback(() => {
-        if (copiedAnnotation) {
-            const newAnn = {
-                ...copiedAnnotation,
-                id: uuidv4(),
-                x: copiedAnnotation.x + 20, // Offset slightly
-                y: copiedAnnotation.y + 20
-            };
-            saveAnnotations([...annotations, newAnn]);
+        if (!Array.isArray(annotations)) return;
+        
+        // Use multiple copied annotations if available
+        const annsToPaste = copiedAnnotations.length > 0 ? copiedAnnotations : 
+                           (copiedAnnotation ? [copiedAnnotation] : []);
+        
+        if (annsToPaste.length === 0) return;
+        
+        // Validate and create new annotations with offset
+        const newAnns = [];
+        const offsetX = 20;
+        const offsetY = 20;
+        
+        annsToPaste.forEach((ann, idx) => {
+            if (ann && typeof ann === 'object' &&
+                typeof ann.x === 'number' && typeof ann.y === 'number' &&
+                typeof ann.width === 'number' && typeof ann.height === 'number' &&
+                typeof ann.class_id === 'number') {
+                newAnns.push({
+                    ...ann,
+                    id: uuidv4(),
+                    x: (ann.x || 0) + offsetX + (idx * 5), // Offset slightly with variation
+                    y: (ann.y || 0) + offsetY + (idx * 5)
+                });
+            }
+        });
+        
+        if (newAnns.length > 0) {
+            saveAnnotations([...annotations, ...newAnns]);
+            // Select the pasted annotations
+            setSelectedAnnotationIds(new Set(newAnns.map(a => a.id)));
+        } else {
+            console.warn('Cannot paste: invalid annotation format');
         }
-    }, [copiedAnnotation, annotations, saveAnnotations]);
+    }, [copiedAnnotation, copiedAnnotations, annotations, saveAnnotations]);
 
     // Save annotations before changing image
     const saveCurrentAnnotations = useCallback(async () => {
@@ -373,17 +468,31 @@ function App() {
 
     // Change image with auto-save
     const changeImageIndex = useCallback(async (newIndex, addToHistory = true) => {
+        // Validate inputs
+        if (typeof newIndex !== 'number' || isNaN(newIndex)) {
+            console.warn('changeImageIndex: Invalid index', newIndex);
+            return;
+        }
+        
         if (newIndex === currentImageIndex) return;
-        if (newIndex < 0 || newIndex >= images.length) return;
+        
+        if (!Array.isArray(images) || newIndex < 0 || newIndex >= images.length) {
+            console.warn('changeImageIndex: Index out of bounds', newIndex, images.length);
+            return;
+        }
         
         // Save current annotations before changing
-        if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath) {
-            await saveCurrentAnnotations();
+        if (currentImageIndex >= 0 && Array.isArray(images) && images[currentImageIndex] && datasetPath) {
+            try {
+                await saveCurrentAnnotations();
+            } catch (err) {
+                console.error('Failed to save annotations before image change:', err);
+            }
         }
         
         // Add to navigation history
-        if (addToHistory && currentImageIndex >= 0) {
-            const newHistory = navigationHistory.slice(0, historyIndex + 1);
+        if (addToHistory && currentImageIndex >= 0 && Array.isArray(navigationHistory)) {
+            const newHistory = navigationHistory.slice(0, Math.max(0, historyIndex + 1));
             newHistory.push(currentImageIndex);
             setNavigationHistory(newHistory);
             setHistoryIndex(newHistory.length - 1);
@@ -443,12 +552,18 @@ function App() {
             }
             
             // Delete key to remove selected annotation(s)
-            if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedAnnotationId || selectedAnnotationIds.size > 0)) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0))) {
+                if (!Array.isArray(annotations)) return;
+                
                 let idsToDelete = new Set();
                 if (selectedAnnotationId) idsToDelete.add(selectedAnnotationId);
-                selectedAnnotationIds.forEach(id => idsToDelete.add(id));
+                if (selectedAnnotationIds && selectedAnnotationIds.forEach) {
+                    selectedAnnotationIds.forEach(id => {
+                        if (id) idsToDelete.add(id);
+                    });
+                }
                 
-                const newAnns = annotations.filter(a => !idsToDelete.has(a.id));
+                const newAnns = annotations.filter(a => a && a.id && !idsToDelete.has(a.id));
                 saveAnnotations(newAnns);
                 setSelectedAnnotationId(null);
                 setSelectedAnnotationIds(new Set());
@@ -456,20 +571,27 @@ function App() {
             }
             
             // Change class with 1-9 keys (works for single or multiple selection)
-            if ((selectedAnnotationId || selectedAnnotationIds.size > 0) && !e.ctrlKey && !e.metaKey) {
+            if ((selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0)) && !e.ctrlKey && !e.metaKey) {
+                if (!Array.isArray(annotations) || !Array.isArray(classes)) return;
+                
                 const numKey = parseInt(e.key);
                 if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
                     const classIndex = numKey - 1;
-                    if (classes[classIndex]) {
+                    if (classes[classIndex] && classes[classIndex].id !== undefined) {
                         let idsToChange = new Set();
                         if (selectedAnnotationId) idsToChange.add(selectedAnnotationId);
-                        selectedAnnotationIds.forEach(id => idsToChange.add(id));
+                        if (selectedAnnotationIds && selectedAnnotationIds.forEach) {
+                            selectedAnnotationIds.forEach(id => {
+                                if (id) idsToChange.add(id);
+                            });
+                        }
                         
-                        const newAnns = annotations.map(a => 
-                            idsToChange.has(a.id) 
+                        const newAnns = annotations.map(a => {
+                            if (!a || !a.id) return a;
+                            return idsToChange.has(a.id) 
                                 ? { ...a, class_id: classes[classIndex].id }
-                                : a
-                        );
+                                : a;
+                        });
                         saveAnnotations(newAnns);
                         e.preventDefault();
                     }
@@ -478,13 +600,17 @@ function App() {
             
             // Duplicate annotation (Ctrl+D)
             if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedAnnotationId) {
-                const ann = annotations.find(a => a.id === selectedAnnotationId);
-                if (ann) {
+                if (!Array.isArray(annotations)) return;
+                
+                const ann = annotations.find(a => a && a.id === selectedAnnotationId);
+                if (ann && typeof ann === 'object' && 
+                    typeof ann.x === 'number' && typeof ann.y === 'number' &&
+                    typeof ann.width === 'number' && typeof ann.height === 'number') {
                     const newAnn = {
                         ...ann,
                         id: uuidv4(),
-                        x: ann.x + 10, // Offset slightly
-                        y: ann.y + 10
+                        x: (ann.x || 0) + 10, // Offset slightly
+                        y: (ann.y || 0) + 10
                     };
                     const newAnns = [...annotations, newAnn];
                     saveAnnotations(newAnns);
@@ -506,21 +632,7 @@ function App() {
             }
             
             // Zoom to selection (Z key)
-            if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey && (selectedAnnotationId || selectedAnnotationIds.size > 0)) {
-                // Trigger zoom to selection
-                const event = new CustomEvent('zoomToSelection');
-                window.dispatchEvent(event);
-                e.preventDefault();
-            }
-            
-            // Toggle fullscreen (F11)
-            if (e.key === 'F11') {
-                setIsFullscreen(prev => !prev);
-                e.preventDefault();
-            }
-            
-            // Zoom to selection (Z key)
-            if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey && (selectedAnnotationId || selectedAnnotationIds.size > 0)) {
+            if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey && (selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0))) {
                 // Trigger zoom to selection
                 const event = new CustomEvent('zoomToSelection');
                 window.dispatchEvent(event);
@@ -557,32 +669,43 @@ function App() {
             
             // N for next unannotated image
             if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                const nextUnannotated = images.findIndex((img, idx) => 
-                    idx > currentImageIndex && !annotatedImages.has(img)
-                );
-                if (nextUnannotated >= 0) {
-                    changeImageIndex(nextUnannotated);
-                    e.preventDefault();
+                if (Array.isArray(images) && annotatedImages && typeof currentImageIndex === 'number') {
+                    const nextUnannotated = images.findIndex((img, idx) => 
+                        img && idx > currentImageIndex && !annotatedImages.has(img)
+                    );
+                    if (nextUnannotated >= 0) {
+                        changeImageIndex(nextUnannotated);
+                        e.preventDefault();
+                    }
                 }
             }
             
             // Shift+N for previous unannotated
             if (e.key === 'N' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                const prevUnannotated = images.slice(0, currentImageIndex).reverse().findIndex(img => 
-                    !annotatedImages.has(img)
-                );
-                if (prevUnannotated >= 0) {
-                    const actualIndex = currentImageIndex - prevUnannotated - 1;
-                    changeImageIndex(actualIndex);
-                    e.preventDefault();
+                if (Array.isArray(images) && annotatedImages && typeof currentImageIndex === 'number' && currentImageIndex > 0) {
+                    const prevUnannotated = images.slice(0, currentImageIndex).reverse().findIndex(img => 
+                        img && !annotatedImages.has(img)
+                    );
+                    if (prevUnannotated >= 0) {
+                        const actualIndex = currentImageIndex - prevUnannotated - 1;
+                        if (actualIndex >= 0 && actualIndex < images.length) {
+                            changeImageIndex(actualIndex);
+                            e.preventDefault();
+                        }
+                    }
                 }
             }
             
             // Select all annotations (Ctrl+A)
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
-                if (annotations.length > 0) {
-                    setSelectedAnnotationIds(new Set(annotations.map(a => a.id)));
-                    e.preventDefault();
+                if (Array.isArray(annotations) && annotations.length > 0) {
+                    const validIds = annotations
+                        .filter(a => a && a.id)
+                        .map(a => a.id);
+                    if (validIds.length > 0) {
+                        setSelectedAnnotationIds(new Set(validIds));
+                        e.preventDefault();
+                    }
                 }
             }
             
@@ -641,14 +764,35 @@ function App() {
     }, [currentImageIndex, images, datasetPath]);
 
     const onChangeAnnotationClass = async (annId, newClassId) => {
-        const newAnns = annotations.map(a => a.id === annId ? { ...a, class_id: newClassId } : a);
+        // Validate inputs
+        if (!annId || typeof newClassId !== 'number' || isNaN(newClassId)) {
+            console.warn('onChangeAnnotationClass: Invalid parameters', annId, newClassId);
+            return;
+        }
+        
+        if (!Array.isArray(annotations)) {
+            console.warn('onChangeAnnotationClass: annotations is not an array');
+            return;
+        }
+        
+        const newAnns = annotations.map(a => {
+            if (!a || !a.id) return a;
+            return a.id === annId ? { ...a, class_id: newClassId } : a;
+        });
+        
         setAnnotations(newAnns);
         // Auto-save
         setSaveStatus('Saving...');
         try {
+            if (!Array.isArray(images) || currentImageIndex < 0 || currentImageIndex >= images.length) {
+                console.error('Invalid image index or images array');
+                setSaveStatus('Error');
+                return;
+            }
+            
             const currentImagePath = images[currentImageIndex];
-            if (!currentImagePath) {
-                console.error('No image path available for saving');
+            if (!currentImagePath || !datasetPath) {
+                console.error('No image path or dataset path available for saving');
                 setSaveStatus('Error');
                 return;
             }
@@ -669,7 +813,7 @@ function App() {
                 });
             }
         } catch (err) {
-            console.error(err);
+            console.error('Failed to change annotation class:', err);
             setSaveStatus('Error');
         }
     };
@@ -901,7 +1045,87 @@ function App() {
                 annotations={annotations}
                 onBatchDeleteClass={(classId) => {
                     const newAnns = annotations.filter(a => a.class_id !== classId);
-                    saveAnnotations(newAnns);
+                    saveAnnotations(newAnns, true, true); // Immediate save for batch operations
+                }}
+                onBatchChangeClass={(oldClassId, newClassId) => {
+                    const newAnns = annotations.map(a => 
+                        a.class_id === oldClassId ? { ...a, class_id: newClassId } : a
+                    );
+                    saveAnnotations(newAnns, true, true);
+                }}
+                onAlignAnnotations={(alignment) => {
+                    if (selectedAnnotationIds.size === 0 && !selectedAnnotationId) return;
+                    
+                    const idsToAlign = selectedAnnotationIds.size > 0 
+                        ? Array.from(selectedAnnotationIds)
+                        : [selectedAnnotationId];
+                    
+                    const annsToAlign = annotations.filter(a => a && idsToAlign.includes(a.id));
+                    if (annsToAlign.length < 2) return;
+                    
+                    let newAnns = [...annotations];
+                    
+                    if (alignment === 'left') {
+                        const minX = Math.min(...annsToAlign.map(a => a.x));
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, x: minX } : a
+                        );
+                    } else if (alignment === 'right') {
+                        const maxX = Math.max(...annsToAlign.map(a => a.x + a.width));
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, x: maxX - a.width } : a
+                        );
+                    } else if (alignment === 'top') {
+                        const minY = Math.min(...annsToAlign.map(a => a.y));
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, y: minY } : a
+                        );
+                    } else if (alignment === 'bottom') {
+                        const maxY = Math.max(...annsToAlign.map(a => a.y + a.height));
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, y: maxY - a.height } : a
+                        );
+                    } else if (alignment === 'center-h') {
+                        const centerX = annsToAlign.reduce((sum, a) => sum + a.x + a.width / 2, 0) / annsToAlign.length;
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, x: centerX - a.width / 2 } : a
+                        );
+                    } else if (alignment === 'center-v') {
+                        const centerY = annsToAlign.reduce((sum, a) => sum + a.y + a.height / 2, 0) / annsToAlign.length;
+                        newAnns = newAnns.map(a => 
+                            idsToAlign.includes(a.id) ? { ...a, y: centerY - a.height / 2 } : a
+                        );
+                    } else if (alignment === 'distribute-h') {
+                        const sorted = [...annsToAlign].sort((a, b) => a.x - b.x);
+                        const totalWidth = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width - sorted[0].x;
+                        const spacing = totalWidth / (sorted.length - 1);
+                        let currentX = sorted[0].x;
+                        sorted.forEach((ann, idx) => {
+                            if (idx > 0 && idx < sorted.length - 1) {
+                                currentX += spacing;
+                                const annIdx = newAnns.findIndex(a => a.id === ann.id);
+                                if (annIdx >= 0) {
+                                    newAnns[annIdx] = { ...newAnns[annIdx], x: currentX - ann.width / 2 };
+                                }
+                            }
+                        });
+                    } else if (alignment === 'distribute-v') {
+                        const sorted = [...annsToAlign].sort((a, b) => a.y - b.y);
+                        const totalHeight = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height - sorted[0].y;
+                        const spacing = totalHeight / (sorted.length - 1);
+                        let currentY = sorted[0].y;
+                        sorted.forEach((ann, idx) => {
+                            if (idx > 0 && idx < sorted.length - 1) {
+                                currentY += spacing;
+                                const annIdx = newAnns.findIndex(a => a.id === ann.id);
+                                if (annIdx >= 0) {
+                                    newAnns[annIdx] = { ...newAnns[annIdx], y: currentY - ann.height / 2 };
+                                }
+                            }
+                        });
+                    }
+                    
+                    saveAnnotations(newAnns, true, true);
                 }}
                 onPreAnnotate={async (modelPath, confidence) => {
                     if (!datasetPath || images.length === 0) {

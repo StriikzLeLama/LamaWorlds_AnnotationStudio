@@ -234,22 +234,26 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         // Handle panning
         if (isPanning) {
             const pointerPos = stage.getPointerPosition();
-            if (pointerPos && lastPointerPos) {
+            if (pointerPos && lastPointerPos && 
+                typeof pointerPos.x === 'number' && typeof pointerPos.y === 'number' &&
+                typeof lastPointerPos.x === 'number' && typeof lastPointerPos.y === 'number') {
                 const dx = pointerPos.x - lastPointerPos.x;
                 const dy = pointerPos.y - lastPointerPos.y;
-                setStagePos({
-                    x: stagePos.x + dx,
-                    y: stagePos.y + dy
-                });
-                setLastPointerPos(pointerPos);
+                if (!isNaN(dx) && !isNaN(dy)) {
+                    setStagePos({
+                        x: (stagePos.x || 0) + dx,
+                        y: (stagePos.y || 0) + dy
+                    });
+                    setLastPointerPos(pointerPos);
+                }
             }
             return;
         }
 
         // Handle selection box
-        if (isSelecting && selectionBox) {
+        if (isSelecting && selectionBox && typeof selectionBox.x === 'number' && typeof selectionBox.y === 'number') {
             const pos = stage.getRelativePointerPosition();
-            if (pos) {
+            if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
                 const width = pos.x - selectionBox.x;
                 const height = pos.y - selectionBox.y;
                 setSelectionBox({
@@ -259,7 +263,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 });
                 
                 // Select annotations within box
-                if (onSelectMultiple) {
+                if (onSelectMultiple && Array.isArray(annotations)) {
                     const boxX = width < 0 ? selectionBox.x + width : selectionBox.x;
                     const boxY = height < 0 ? selectionBox.y + height : selectionBox.y;
                     const boxW = Math.abs(width);
@@ -267,6 +271,10 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                     
                     const selected = new Set(selectedIds || new Set());
                     annotations.forEach(ann => {
+                        if (!ann || typeof ann.x !== 'number' || typeof ann.y !== 'number' ||
+                            typeof ann.width !== 'number' || typeof ann.height !== 'number' || !ann.id) {
+                            return;
+                        }
                         const annRight = ann.x + ann.width;
                         const annBottom = ann.y + ann.height;
                         const boxRight = boxX + boxW;
@@ -286,13 +294,15 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         // Handle drawing
         if (!newAnnotation) return;
         const pos = stage.getRelativePointerPosition();
-        if (!pos) return;
-
-        setNewAnnotation({
-            ...newAnnotation,
-            width: pos.x - newAnnotation.x,
-            height: pos.y - newAnnotation.y
-        });
+        if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') return;
+        
+        if (typeof newAnnotation.x === 'number' && typeof newAnnotation.y === 'number') {
+            setNewAnnotation({
+                ...newAnnotation,
+                width: pos.x - newAnnotation.x,
+                height: pos.y - newAnnotation.y
+            });
+        }
     };
 
     const handleMouseUp = (e) => {
@@ -309,64 +319,103 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
             return;
         }
 
-        if (!newAnnotation) return;
+        if (!newAnnotation || typeof newAnnotation.x !== 'number' || typeof newAnnotation.y !== 'number') {
+            setNewAnnotation(null);
+            return;
+        }
+        
         // Normalize rect (width/height can be negative)
-        const x = newAnnotation.width < 0 ? newAnnotation.x + newAnnotation.width : newAnnotation.x;
-        const y = newAnnotation.height < 0 ? newAnnotation.y + newAnnotation.height : newAnnotation.y;
-        const width = Math.abs(newAnnotation.width);
-        const height = Math.abs(newAnnotation.height);
+        const width = typeof newAnnotation.width === 'number' ? Math.abs(newAnnotation.width) : 0;
+        const height = typeof newAnnotation.height === 'number' ? Math.abs(newAnnotation.height) : 0;
+        const x = (typeof newAnnotation.width === 'number' && newAnnotation.width < 0) 
+            ? newAnnotation.x + newAnnotation.width 
+            : newAnnotation.x;
+        const y = (typeof newAnnotation.height === 'number' && newAnnotation.height < 0) 
+            ? newAnnotation.y + newAnnotation.height 
+            : newAnnotation.y;
 
-        if (width > 5 && height > 5) {
+        if (width > 5 && height > 5 && !isNaN(x) && !isNaN(y) && !isNaN(width) && !isNaN(height) &&
+            typeof newAnnotation.class_id === 'number' && !isNaN(newAnnotation.class_id)) {
             const finalAnnotation = {
                 id: uuidv4(),
                 class_id: newAnnotation.class_id,
                 x, y, width, height,
                 confidence: 1.0
             };
-            onChange([...annotations, finalAnnotation]);
+            if (Array.isArray(annotations)) {
+                onChange([...annotations, finalAnnotation]);
+            } else {
+                onChange([finalAnnotation]);
+            }
         }
         setNewAnnotation(null);
     };
 
     const handleDragEnd = (e, id) => {
-        if (!annotations || !Array.isArray(annotations)) return;
+        if (!annotations || !Array.isArray(annotations) || !id) return;
         const box = annotations.find(a => a && a.id === id);
-        if (box && e.target) {
-            const newAnns = annotations.map(a => {
-                if (a && a.id === id) {
-                    return {
-                        ...a,
-                        x: e.target.x(),
-                        y: e.target.y()
-                    };
-                }
-                return a;
-            });
-            onChange(newAnns);
+        if (box && e.target && typeof e.target.x === 'function' && typeof e.target.y === 'function') {
+            const newX = e.target.x();
+            const newY = e.target.y();
+            if (typeof newX === 'number' && typeof newY === 'number' && !isNaN(newX) && !isNaN(newY)) {
+                const newAnns = annotations.map(a => {
+                    if (a && a.id === id) {
+                        return {
+                            ...a,
+                            x: newX,
+                            y: newY
+                        };
+                    }
+                    return a;
+                });
+                onChange(newAnns);
+            }
         }
     };
 
     const handleTransformEnd = (e) => {
         if (!selectedId || !layerRef.current) return;
         const node = layerRef.current.findOne(`#${selectedId}`);
-        if (!node) return;
+        if (!node || typeof node.x !== 'function' || typeof node.y !== 'function' ||
+            typeof node.width !== 'function' || typeof node.height !== 'function' ||
+            typeof node.scaleX !== 'function' || typeof node.scaleY !== 'function') return;
 
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
+
+        // Validate scale values
+        if (typeof scaleX !== 'number' || typeof scaleY !== 'number' || 
+            isNaN(scaleX) || isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
+            console.warn('Invalid scale values in handleTransformEnd');
+            return;
+        }
 
         // update state
         node.scaleX(1);
         node.scaleY(1);
 
         if (!annotations || !Array.isArray(annotations)) return;
+        
+        const newX = node.x();
+        const newY = node.y();
+        const nodeWidth = node.width();
+        const nodeHeight = node.height();
+        
+        if (typeof newX !== 'number' || typeof newY !== 'number' ||
+            typeof nodeWidth !== 'number' || typeof nodeHeight !== 'number' ||
+            isNaN(newX) || isNaN(newY) || isNaN(nodeWidth) || isNaN(nodeHeight)) {
+            console.warn('Invalid position/size values in handleTransformEnd');
+            return;
+        }
+        
         const newAnns = annotations.map(a => {
             if (a && a.id === selectedId) {
                 return {
                     ...a,
-                    x: node.x(),
-                    y: node.y(),
-                    width: Math.max(5, node.width() * scaleX),
-                    height: Math.max(5, node.height() * scaleY)
+                    x: newX,
+                    y: newY,
+                    width: Math.max(5, nodeWidth * scaleX),
+                    height: Math.max(5, nodeHeight * scaleY)
                 };
             }
             return a;

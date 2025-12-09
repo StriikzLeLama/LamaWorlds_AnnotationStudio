@@ -70,13 +70,19 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
     };
 
     const getClassName = (classId) => {
-        const cls = classes.find(c => c.id === classId);
-        return cls ? cls.name : `Class ${classId}`;
+        if (!Array.isArray(classes) || typeof classId !== 'number') {
+            return `Class ${classId || '?'}`;
+        }
+        const cls = classes.find(c => c && c.id === classId);
+        return cls && cls.name ? cls.name : `Class ${classId}`;
     };
 
     const handleClassChange = (annId, newClassId) => {
-        if (onChangeAnnotationClass) {
-            onChangeAnnotationClass(annId, parseInt(newClassId));
+        if (onChangeAnnotationClass && annId) {
+            const parsedId = parseInt(newClassId);
+            if (!isNaN(parsedId)) {
+                onChangeAnnotationClass(annId, parsedId);
+            }
         }
     };
     

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings } from 'lucide-react';
 
-function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence }) {
+function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence }) {
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
@@ -49,14 +49,33 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
     };
 
     const addClass = () => {
-        if (!newClassName.trim()) {
+        if (!newClassName || typeof newClassName !== 'string' || !newClassName.trim()) {
             return;
         }
+        
+        if (!Array.isArray(classes)) {
+            console.warn('Classes is not an array');
+            return;
+        }
+        
         const colors = ["#00e0ff", "#56b0ff", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a8e6cf", "#ff8b94", "#c7ceea"];
-        const newId = classes.length > 0 ? Math.max(...classes.map(c => c.id)) + 1 : 0;
+        let newId = 0;
+        if (classes.length > 0) {
+            const validIds = classes.filter(c => c && typeof c.id === 'number' && !isNaN(c.id)).map(c => c.id);
+            if (validIds.length > 0) {
+                newId = Math.max(...validIds) + 1;
+            }
+        }
+        
+        const trimmedName = newClassName.trim();
+        if (trimmedName.length === 0 || trimmedName.length > 100) {
+            alert('Class name must be between 1 and 100 characters');
+            return;
+        }
+        
         const newClass = {
             id: newId,
-            name: newClassName.trim(),
+            name: trimmedName,
             color: colors[newId % colors.length]
         };
         setClasses([...classes, newClass]);
@@ -276,14 +295,17 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                             borderRadius: '8px',
                             padding: '12px',
                             zIndex: 1000,
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                            maxHeight: '400px',
+                            overflowY: 'auto'
                         }}>
-                            <div style={{ fontSize: '0.85rem', color: '#aaa', marginBottom: '8px' }}>Delete all annotations by class:</div>
+                            {/* Delete Operations */}
+                            <div style={{ fontSize: '0.85rem', color: '#aaa', marginBottom: '8px', fontWeight: 'bold' }}>Delete:</div>
                             {classes.map(cls => {
                                 const count = annotations ? annotations.filter(a => a.class_id === cls.id).length : 0;
                                 return (
                                     <button
-                                        key={cls.id}
+                                        key={`delete-${cls.id}`}
                                         onClick={() => {
                                             handleBatchDelete(cls.id);
                                             setShowBatchMenu(false);
@@ -309,6 +331,65 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                                     </button>
                                 );
                             })}
+                            
+                            {/* Change Class Operations */}
+                            {onBatchChangeClass && (
+                                <>
+                                    <div style={{ fontSize: '0.85rem', marginTop: '12px', marginBottom: '8px', color: '#aaa', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>Change Class:</div>
+                                    {classes.map(oldClass => {
+                                        const count = annotations ? annotations.filter(a => a.class_id === oldClass.id).length : 0;
+                                        if (count === 0) return null;
+                                        return (
+                                            <div key={`change-${oldClass.id}`} style={{ marginBottom: '8px' }}>
+                                                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
+                                                    Change {count} "{oldClass.name}" to:
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                    {classes.filter(c => c.id !== oldClass.id).map(newClass => (
+                                                        <button
+                                                            key={`change-${oldClass.id}-${newClass.id}`}
+                                                            className="btn-secondary"
+                                                            style={{ 
+                                                                flex: '1 1 auto',
+                                                                minWidth: '60px',
+                                                                fontSize: '0.7rem',
+                                                                padding: '4px 6px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            onClick={() => {
+                                                                onBatchChangeClass(oldClass.id, newClass.id);
+                                                                setShowBatchMenu(false);
+                                                            }}
+                                                        >
+                                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: newClass.color }}></div>
+                                                            {newClass.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </>
+                            )}
+                            
+                            {/* Alignment Operations */}
+                            {onAlignAnnotations && (
+                                <>
+                                    <div style={{ fontSize: '0.85rem', marginTop: '12px', marginBottom: '8px', color: '#aaa', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>Align:</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('left'); setShowBatchMenu(false); }}>Left</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('right'); setShowBatchMenu(false); }}>Right</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('top'); setShowBatchMenu(false); }}>Top</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('bottom'); setShowBatchMenu(false); }}>Bottom</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('center-h'); setShowBatchMenu(false); }}>Center H</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('center-v'); setShowBatchMenu(false); }}>Center V</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('distribute-h'); setShowBatchMenu(false); }}>Distribute H</button>
+                                        <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '6px' }} onClick={() => { onAlignAnnotations('distribute-v'); setShowBatchMenu(false); }}>Distribute V</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

@@ -108,6 +108,12 @@ def load_dataset(data: DatasetPath):
 @app.post("/load_annotation")
 def load_annotation(dataset_path: str = Body(...), image_path: str = Body(...)):
     try:
+        # Validate inputs
+        if not dataset_path or not isinstance(dataset_path, str):
+            raise HTTPException(status_code=400, detail="Invalid dataset_path")
+        if not image_path or not isinstance(image_path, str):
+            raise HTTPException(status_code=400, detail="Invalid image_path")
+        
         # derive label path
         if os.path.isabs(image_path):
             image_full_path = image_path
@@ -117,8 +123,14 @@ def load_annotation(dataset_path: str = Body(...), image_path: str = Body(...)):
         # Verify image exists
         if not os.path.exists(image_full_path):
             raise HTTPException(status_code=404, detail=f"Image not found: {image_full_path}")
+        
+        # Validate it's actually a file
+        if not os.path.isfile(image_full_path):
+            raise HTTPException(status_code=400, detail=f"Path is not a file: {image_full_path}")
             
         base_name = os.path.splitext(os.path.basename(image_full_path))[0]
+        if not base_name:
+            raise HTTPException(status_code=400, detail="Invalid image filename")
         
         # Try logic to find label dir
         if os.path.basename(os.path.dirname(image_full_path)) == "images":
@@ -130,19 +142,49 @@ def load_annotation(dataset_path: str = Body(...), image_path: str = Body(...)):
         
         boxes = parse_yolo_file(label_file)
         
+        # Validate boxes is a list
+        if not isinstance(boxes, list):
+            boxes = []
+        
         # Convert normalized to pixel
         try:
             with Image.open(image_full_path) as img:
                 img_w, img_h = img.size
                 
+            # Validate image dimensions
+            if img_w <= 0 or img_h <= 0:
+                raise HTTPException(status_code=400, detail=f"Invalid image dimensions: {img_w}x{img_h}")
+                
             pixel_boxes = []
-            for box in boxes:
-                # YOLO: x_center, y_center, w, h (normalized)
-                # Pixel: x_left, y_top, w, h
-                w = box['width'] * img_w
-                h = box['height'] * img_h
-                x_center = box['x'] * img_w
-                y_center = box['y'] * img_h
+            for idx, box in enumerate(boxes):
+                # Validate box structure
+                if not isinstance(box, dict):
+                    continue
+                
+                # Validate required fields
+                required_fields = ['x', 'y', 'width', 'height', 'class_id']
+                if not all(field in box for field in required_fields):
+                    continue
+                
+                try:
+                    # YOLO: x_center, y_center, w, h (normalized)
+                    # Pixel: x_left, y_top, w, h
+                    x_norm = float(box['x'])
+                    y_norm = float(box['y'])
+                    w_norm = float(box['width'])
+                    h_norm = float(box['height'])
+                    class_id = int(box['class_id'])
+                except (ValueError, TypeError, KeyError):
+                    continue
+                
+                # Validate normalized values are in range [0, 1]
+                if not (0 <= x_norm <= 1 and 0 <= y_norm <= 1 and 0 <= w_norm <= 1 and 0 <= h_norm <= 1):
+                    continue
+                
+                w = w_norm * img_w
+                h = h_norm * img_h
+                x_center = x_norm * img_w
+                y_center = y_norm * img_h
                 
                 x_left = max(0, x_center - (w / 2))
                 y_top = max(0, y_center - (h / 2))
@@ -262,23 +304,44 @@ def save_annotation_endpoint(data: AnnotationData):
             yolo_boxes = []
             validation_errors = []
             
+            # Validate data.boxes is a list
+            if not isinstance(data.boxes, list):
+                raise HTTPException(status_code=400, detail="boxes must be a list")
+            
             for idx, box in enumerate(data.boxes):
-                # Box is x_left, y_top, w, h (pixels)
-                # YOLO is x_center, y_center, w, h (normalized)
-                
-                # Validate box
-                if box.width <= 0 or box.height <= 0:
-                    validation_errors.append(f"Box {idx}: Invalid dimensions (width={box.width}, height={box.height})")
+                # Validate box object
+                if not hasattr(box, 'x') or not hasattr(box, 'y') or not hasattr(box, 'width') or not hasattr(box, 'height') or not hasattr(box, 'class_id'):
+                    validation_errors.append(f"Box {idx}: Missing required fields")
                     continue
                 
-                if box.x < 0 or box.y < 0:
-                    validation_errors.append(f"Box {idx}: Negative position (x={box.x}, y={box.y})")
+                # Validate types
+                try:
+                    x_val = float(box.x) if box.x is not None else 0
+                    y_val = float(box.y) if box.y is not None else 0
+                    w_val = float(box.width) if box.width is not None else 0
+                    h_val = float(box.height) if box.height is not None else 0
+                    class_id_val = int(box.class_id) if box.class_id is not None else 0
+                except (ValueError, TypeError) as e:
+                    validation_errors.append(f"Box {idx}: Invalid type for coordinates ({e})")
+                    continue
+                
+                # Validate box dimensions
+                if w_val <= 0 or h_val <= 0:
+                    validation_errors.append(f"Box {idx}: Invalid dimensions (width={w_val}, height={h_val})")
+                    continue
+                
+                if x_val < 0 or y_val < 0:
+                    validation_errors.append(f"Box {idx}: Negative position (x={x_val}, y={y_val})")
+                
+                # Validate image dimensions
+                if img_w <= 0 or img_h <= 0:
+                    raise HTTPException(status_code=400, detail=f"Invalid image dimensions: {img_w}x{img_h}")
                 
                 # Clamp box to image bounds
-                x_left = max(0, min(box.x, img_w))
-                y_top = max(0, min(box.y, img_h))
-                width = max(0, min(box.width, img_w - x_left))
-                height = max(0, min(box.height, img_h - y_top))
+                x_left = max(0, min(x_val, img_w))
+                y_top = max(0, min(y_val, img_h))
+                width = max(0, min(w_val, img_w - x_left))
+                height = max(0, min(h_val, img_h - y_top))
                 
                 if width <= 0 or height <= 0:
                     validation_errors.append(f"Box {idx}: Box outside image bounds")
@@ -288,23 +351,29 @@ def save_annotation_endpoint(data: AnnotationData):
                 if width < 5 or height < 5:
                     validation_errors.append(f"Box {idx}: Too small (min 5x5 pixels required)")
 
-                w_norm = width / img_w
-                h_norm = height / img_h
+                # Calculate normalized values with division by zero protection
+                w_norm = width / img_w if img_w > 0 else 0
+                h_norm = height / img_h if img_h > 0 else 0
                 
                 x_center_pixel = x_left + (width / 2)
                 y_center_pixel = y_top + (height / 2)
                 
-                x_norm = x_center_pixel / img_w
-                y_norm = y_center_pixel / img_h
+                x_norm = x_center_pixel / img_w if img_w > 0 else 0
+                y_norm = y_center_pixel / img_h if img_h > 0 else 0
                 
-                # Clamp 0-1
+                # Clamp 0-1 and validate
                 w_norm = min(max(w_norm, 0), 1)
                 h_norm = min(max(h_norm, 0), 1)
                 x_norm = min(max(x_norm, 0), 1)
                 y_norm = min(max(y_norm, 0), 1)
+                
+                # Final validation of normalized values
+                if not (0 <= x_norm <= 1 and 0 <= y_norm <= 1 and 0 <= w_norm <= 1 and 0 <= h_norm <= 1):
+                    validation_errors.append(f"Box {idx}: Normalized values out of range")
+                    continue
 
                 yolo_boxes.append({
-                    "class_id": box.class_id,
+                    "class_id": class_id_val,
                     "x": x_norm,
                     "y": y_norm,
                     "width": w_norm,
