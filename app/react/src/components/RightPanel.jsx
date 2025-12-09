@@ -352,7 +352,6 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             )}
                         </div>
                     )}
-                    )}
                 </div>
             </div>
 

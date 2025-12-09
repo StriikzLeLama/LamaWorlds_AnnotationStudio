@@ -1,17 +1,25 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Transformer } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Rect, Transformer, Line, Text } from 'react-konva';
 import useImage from 'use-image';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize2, Minimize2, FlipHorizontal, FlipVertical, Eye, EyeOff } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
+import MiniMap from './MiniMap';
 
 const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false, vertical: false }, onImageLoad }) => {
     const [image] = useImage(src);
+    const onImageLoadRef = React.useRef(onImageLoad);
+    
+    // Update ref when callback changes
+    React.useEffect(() => {
+        onImageLoadRef.current = onImageLoad;
+    }, [onImageLoad]);
     
     React.useEffect(() => {
-        if (image && onImageLoad) {
-            onImageLoad(image);
+        if (image && onImageLoadRef.current) {
+            onImageLoadRef.current(image);
         }
-    }, [image, onImageLoad]);
+    }, [image]); // Only depend on image, not onImageLoad
     
     if (!image) return null;
     
@@ -34,6 +42,19 @@ const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false,
 });
 
 const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple, showAnnotations = true, onZoomToSelection, isFullscreen = false, onToggleFullscreen }) => {
+    // Settings
+    const { settings, getSetting } = useSettings();
+    const snapToGrid = getSetting('snapToGrid', false);
+    const gridSize = getSetting('gridSize', 10);
+    const pixelMoveStep = getSetting('pixelMoveStep', 1);
+    const shiftPixelMoveStep = getSetting('shiftPixelMoveStep', 10);
+    const lockAspectRatio = getSetting('lockAspectRatio', false);
+    const showGrid = getSetting('showGrid', false);
+    const gridOpacity = getSetting('gridOpacity', 0.3);
+    const annotationOpacity = getSetting('annotationOpacity', 0.7);
+    const showAnnotationLabels = getSetting('showAnnotationLabels', true);
+    const showAnnotationIds = getSetting('showAnnotationIds', false);
+    
     const [stageScale, setStageScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
     const [newAnnotation, setNewAnnotation] = useState(null);
@@ -45,6 +66,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     const [selectionBox, setSelectionBox] = useState(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
 
     const stageRef = useRef(null);
     const trRef = useRef(null);
@@ -96,11 +118,144 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         setStagePos(newPos);
     };
 
-    // Keyboard shortcuts for zoom and rotation
+    // Zoom functions - memoized for performance (must be declared before useEffect that uses them)
+    const zoomIn = useCallback(() => {
+        setStageScale(prev => Math.min(5, prev * 1.2));
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        setStageScale(prev => Math.max(0.1, prev / 1.2));
+    }, []);
+
+    const resetZoom = useCallback(() => {
+        setStageScale(1);
+        if (containerRef.current && imageLoaded && imageRef.current) {
+            const container = containerRef.current;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            const img = imageRef.current;
+            
+            if (img.width && img.height) {
+                const centerX = containerWidth / 2;
+                const centerY = containerHeight / 2;
+                const imageCenterX = img.width / 2;
+                const imageCenterY = img.height / 2;
+                
+                setStagePos({
+                    x: centerX - imageCenterX,
+                    y: centerY - imageCenterY
+                });
+            } else {
+                setStagePos({ x: 0, y: 0 });
+            }
+        } else {
+            setStagePos({ x: 0, y: 0 });
+        }
+    }, [imageLoaded]);
+
+    const fitToScreen = useCallback(() => {
+        resetZoom();
+    }, [resetZoom]);
+
+    const rotateImage = useCallback((direction) => {
+        setImageRotation(prev => (prev + (direction === 'cw' ? 90 : -90)) % 360);
+    }, []);
+
+    const flipImage = useCallback((axis) => {
+        if (axis === 'horizontal') {
+            setImageFlip(prev => ({ ...prev, horizontal: !prev.horizontal }));
+        } else {
+            setImageFlip(prev => ({ ...prev, vertical: !prev.vertical }));
+        }
+    }, []);
+
+    // Keyboard shortcuts for zoom, rotation, and pixel movement
     useEffect(() => {
         const handleKeyDown = (e) => {
             // Only handle if not typing in input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            // Pixel movement with arrow keys (for selected annotations)
+            if ((selectedId || (selectedIds && selectedIds.size > 0)) && !e.ctrlKey && !e.metaKey && !e.altKey && Array.isArray(annotations)) {
+                const step = e.shiftKey ? shiftPixelMoveStep : pixelMoveStep;
+                let moved = false;
+                
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const newAnns = annotations.map(a => {
+                        if (!a || !a.id) return a;
+                        if (a && a.id && (a.id === selectedId || (selectedIds && selectedIds.has(a.id)))) {
+                            let newX = a.x - step;
+                            if (snapToGrid && gridSize > 0) {
+                                newX = Math.round(newX / gridSize) * gridSize;
+                            }
+                            return { ...a, x: Math.max(0, newX) };
+                        }
+                        return a;
+                    });
+                    onChange(newAnns);
+                    moved = true;
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const newAnns = annotations.map(a => {
+                        if (!a || !a.id) return a;
+                        if (a.id === selectedId || (selectedIds && selectedIds.has(a.id))) {
+                            let newX = a.x + step;
+                            if (snapToGrid && gridSize > 0) {
+                                newX = Math.round(newX / gridSize) * gridSize;
+                            }
+                            return { ...a, x: newX };
+                        }
+                        return a;
+                    });
+                    onChange(newAnns);
+                    moved = true;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const newAnns = annotations.map(a => {
+                        if (!a || !a.id) return a;
+                        if (a.id === selectedId || (selectedIds && selectedIds.has(a.id))) {
+                            let newY = a.y - step;
+                            if (snapToGrid && gridSize > 0) {
+                                newY = Math.round(newY / gridSize) * gridSize;
+                            }
+                            return { ...a, y: Math.max(0, newY) };
+                        }
+                        return a;
+                    });
+                    onChange(newAnns);
+                    moved = true;
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const newAnns = annotations.map(a => {
+                        if (!a || !a.id) return a;
+                        if (a.id === selectedId || (selectedIds && selectedIds.has(a.id))) {
+                            let newY = a.y + step;
+                            if (snapToGrid && gridSize > 0) {
+                                newY = Math.round(newY / gridSize) * gridSize;
+                            }
+                            return { ...a, y: newY };
+                        }
+                        return a;
+                    });
+                    onChange(newAnns);
+                    moved = true;
+                }
+                
+                if (moved) return;
+            }
+            
+            // Toggle grid (G key)
+            if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                // Toggle handled by settings
+            }
+            
+            // Toggle snap to grid (S key)
+            if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                // Toggle handled by settings
+            }
             
             // Zoom controls
             if ((e.ctrlKey || e.metaKey) && e.key === '=') {
@@ -139,7 +294,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [selectedId, selectedIds, annotations, snapToGrid, gridSize, pixelMoveStep, shiftPixelMoveStep, onChange, zoomIn, zoomOut, resetZoom, rotateImage, flipImage]);
 
     const checkDeselect = (e) => {
         const clickedOnEmpty = e.target === stageRef.current || e.target === layerRef.current;
@@ -217,9 +372,17 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         const pos = stage.getRelativePointerPosition();
         if (!pos) return;
 
+        // Apply snap to grid if enabled
+        let x = pos.x;
+        let y = pos.y;
+        if (snapToGrid && gridSize > 0) {
+            x = Math.round(x / gridSize) * gridSize;
+            y = Math.round(y / gridSize) * gridSize;
+        }
+
         setNewAnnotation({
-            x: pos.x, 
-            y: pos.y, 
+            x, 
+            y, 
             width: 0, 
             height: 0,
             class_id: selectedClassId,
@@ -297,10 +460,29 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') return;
         
         if (typeof newAnnotation.x === 'number' && typeof newAnnotation.y === 'number') {
+            let width = pos.x - newAnnotation.x;
+            let height = pos.y - newAnnotation.y;
+            
+            // Apply snap to grid if enabled
+            if (snapToGrid && gridSize > 0) {
+                width = Math.round(width / gridSize) * gridSize;
+                height = Math.round(height / gridSize) * gridSize;
+            }
+            
+            // Lock aspect ratio if enabled
+            if (lockAspectRatio && newAnnotation.width !== 0) {
+                const aspectRatio = newAnnotation.width / newAnnotation.height;
+                if (Math.abs(width) > Math.abs(height)) {
+                    height = Math.sign(height) * Math.abs(width) / aspectRatio;
+                } else {
+                    width = Math.sign(width) * Math.abs(height) * aspectRatio;
+                }
+            }
+            
             setNewAnnotation({
                 ...newAnnotation,
-                width: pos.x - newAnnotation.x,
-                height: pos.y - newAnnotation.y
+                width,
+                height
             });
         }
     };
@@ -351,19 +533,26 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         setNewAnnotation(null);
     };
 
-    const handleDragEnd = (e, id) => {
+    const handleDragEnd = (e, id, newX = null, newY = null) => {
         if (!annotations || !Array.isArray(annotations) || !id) return;
         const box = annotations.find(a => a && a.id === id);
         if (box && e.target && typeof e.target.x === 'function' && typeof e.target.y === 'function') {
-            const newX = e.target.x();
-            const newY = e.target.y();
-            if (typeof newX === 'number' && typeof newY === 'number' && !isNaN(newX) && !isNaN(newY)) {
+            let finalX = newX !== null ? newX : e.target.x();
+            let finalY = newY !== null ? newY : e.target.y();
+            
+            // Apply snap to grid if enabled
+            if (snapToGrid && gridSize > 0) {
+                finalX = Math.round(finalX / gridSize) * gridSize;
+                finalY = Math.round(finalY / gridSize) * gridSize;
+            }
+            
+            if (typeof finalX === 'number' && typeof finalY === 'number' && !isNaN(finalX) && !isNaN(finalY)) {
                 const newAnns = annotations.map(a => {
                     if (a && a.id === id) {
                         return {
                             ...a,
-                            x: newX,
-                            y: newY
+                            x: finalX,
+                            y: finalY
                         };
                     }
                     return a;
@@ -499,28 +688,38 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         return () => window.removeEventListener('toggleAnnotations', handleToggleAnnotations);
     }, []);
 
-    // Center image callback
+    // Center image callback - use ref to prevent infinite loops
     const handleImageLoad = useCallback((image) => {
-        if (image && containerRef.current) {
-            imageRef.current = image;
-            const container = containerRef.current;
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-            
-            if (image.width && image.height) {
-                // Center the image in the container
-                const centerX = containerWidth / 2;
-                const centerY = containerHeight / 2;
-                const imageCenterX = image.width / 2;
-                const imageCenterY = image.height / 2;
-                
-                setStagePos({
-                    x: centerX - imageCenterX,
-                    y: centerY - imageCenterY
-                });
-                setImageLoaded(true);
+        if (!image || !containerRef.current) return;
+        
+        // Check if dimensions are already set to avoid unnecessary updates
+        const newDimensions = { width: image.width || 0, height: image.height || 0 };
+        if (newDimensions.width === 0 || newDimensions.height === 0) return;
+        
+        imageRef.current = image;
+        const container = containerRef.current;
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        
+        // Only update if dimensions actually changed
+        setImageDimensions(prev => {
+            if (prev.width === newDimensions.width && prev.height === newDimensions.height) {
+                return prev; // Return same object to prevent re-render
             }
-        }
+            return newDimensions;
+        });
+        
+        // Center the image in the container
+        const centerX = containerWidth / 2;
+        const centerY = containerHeight / 2;
+        const imageCenterX = image.width / 2;
+        const imageCenterY = image.height / 2;
+        
+        setStagePos({
+            x: centerX - imageCenterX,
+            y: centerY - imageCenterY
+        });
+        setImageLoaded(true);
     }, []);
     
     // Reset view and center image when image changes
@@ -532,55 +731,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
         setStagePos({ x: 0, y: 0 });
     }, [imageUrl]);
 
-    // Zoom functions - memoized for performance
-    const zoomIn = useCallback(() => {
-        setStageScale(prev => Math.min(5, prev * 1.2));
-    }, []);
-
-    const zoomOut = useCallback(() => {
-        setStageScale(prev => Math.max(0.1, prev / 1.2));
-    }, []);
-
-    const resetZoom = useCallback(() => {
-        setStageScale(1);
-        if (containerRef.current && imageLoaded && imageRef.current) {
-            const container = containerRef.current;
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-            const img = imageRef.current;
-            
-            if (img.width && img.height) {
-                const centerX = containerWidth / 2;
-                const centerY = containerHeight / 2;
-                const imageCenterX = img.width / 2;
-                const imageCenterY = img.height / 2;
-                
-                setStagePos({
-                    x: centerX - imageCenterX,
-                    y: centerY - imageCenterY
-                });
-            } else {
-                setStagePos({ x: 0, y: 0 });
-            }
-        } else {
-            setStagePos({ x: 0, y: 0 });
-        }
-    }, [imageLoaded]);
-
-    const fitToScreen = useCallback(() => {
-        resetZoom();
-    }, [resetZoom]);
-
-    const rotateImage = useCallback((direction) => {
-        setImageRotation(prev => (prev + (direction === 'cw' ? 90 : -90)) % 360);
-    }, []);
-
-    const flipImage = useCallback((axis) => {
-        if (axis === 'horizontal') {
-            setImageFlip(prev => ({ ...prev, horizontal: !prev.horizontal }));
-        } else {
-            setImageFlip(prev => ({ ...prev, vertical: !prev.vertical }));
-        }
+    // Handle minimap navigation
+    const handleMinimapNavigate = useCallback((newPos) => {
+        setStagePos(newPos);
     }, []);
 
     if (!imageUrl) {
@@ -801,19 +954,59 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <Layer ref={layerRef}>
                     <CanvasImage src={imageUrl} rotation={imageRotation} flip={imageFlip} onImageLoad={handleImageLoad} />
 
-                    {showAnnotations && annotations.map((ann) => {
+                    {/* Grid overlay */}
+                    {showGrid && imageDimensions.width > 0 && imageDimensions.height > 0 && gridSize > 0 && (
+                        <>
+                            {/* Vertical lines */}
+                            {Array.from({ length: Math.ceil(imageDimensions.width / gridSize) + 1 }).map((_, i) => {
+                                const x = i * gridSize;
+                                return (
+                                    <Line
+                                        key={`v-${i}`}
+                                        points={[x, 0, x, imageDimensions.height]}
+                                        stroke="rgba(0, 224, 255, 0.3)"
+                                        strokeWidth={1}
+                                        opacity={gridOpacity}
+                                        listening={false}
+                                    />
+                                );
+                            })}
+                            {/* Horizontal lines */}
+                            {Array.from({ length: Math.ceil(imageDimensions.height / gridSize) + 1 }).map((_, i) => {
+                                const y = i * gridSize;
+                                return (
+                                    <Line
+                                        key={`h-${i}`}
+                                        points={[0, y, imageDimensions.width, y]}
+                                        stroke="rgba(0, 224, 255, 0.3)"
+                                        strokeWidth={1}
+                                        opacity={gridOpacity}
+                                        listening={false}
+                                    />
+                                );
+                            })}
+                        </>
+                    )}
+
+                    {showAnnotations && Array.isArray(annotations) && annotations.map((ann) => {
+                        if (!ann || !ann.id) return null;
                         const isSelected = selectedId === ann.id || (selectedIds && selectedIds.has(ann.id));
+                        const className = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
+                        const classColor = className ? className.color : '#00e0ff';
+                        const classNameStr = className ? className.name : `Class ${ann.class_id}`;
+                        const rgb = classColor.match(/\w\w/g)?.map(x => parseInt(x, 16)) || [0, 224, 255];
                         return (
+                            <React.Fragment key={ann.id}>
                             <Rect
-                                key={ann.id}
                                 id={ann.id}
                                 x={ann.x}
                                 y={ann.y}
                                 width={ann.width}
                                 height={ann.height}
-                                stroke={isSelected ? '#ffff00' : getColor(ann.class_id)}
+                                stroke={isSelected ? '#ffff00' : classColor}
                                 strokeWidth={isSelected ? Math.max(2, 3 / stageScale) : Math.max(1, 2 / stageScale)}
-                                fill={isSelected ? 'rgba(255, 255, 0, 0.1)' : 'transparent'}
+                                fill={isSelected ? 'rgba(255, 255, 0, 0.1)' : `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${annotationOpacity * 0.2})`}
+                                opacity={annotationOpacity}
                                 draggable
                                 onClick={(e) => { 
                                     e.cancelBubble = true;
@@ -837,8 +1030,60 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                     onSelect(ann.id);
                                     if (onSelectMultiple) onSelectMultiple(new Set([ann.id]));
                                 }}
-                                onDragEnd={(e) => handleDragEnd(e, ann.id)}
+                                onDragEnd={(e) => {
+                                    let newX = e.target.x();
+                                    let newY = e.target.y();
+                                    
+                                    // Apply snap to grid if enabled
+                                    if (snapToGrid && gridSize > 0) {
+                                        newX = Math.round(newX / gridSize) * gridSize;
+                                        newY = Math.round(newY / gridSize) * gridSize;
+                                    }
+                                    
+                                    handleDragEnd(e, ann.id, newX, newY);
+                                }}
                             />
+                            {/* Annotation labels */}
+                            {(showAnnotationLabels || showAnnotationIds) && (
+                                <>
+                                    {showAnnotationLabels && (
+                                        <>
+                                            <Rect
+                                                x={ann.x}
+                                                y={Math.max(0, ann.y - 20)}
+                                                width={Math.max(60, classNameStr.length * 7)}
+                                                height={18}
+                                                fill="rgba(0, 0, 0, 0.7)"
+                                                stroke={classColor}
+                                                strokeWidth={1}
+                                                opacity={annotationOpacity}
+                                                listening={false}
+                                            />
+                                            <Text
+                                                x={ann.x + 4}
+                                                y={Math.max(0, ann.y - 18)}
+                                                text={classNameStr}
+                                                fontSize={12}
+                                                fill={classColor}
+                                                opacity={annotationOpacity}
+                                                listening={false}
+                                            />
+                                        </>
+                                    )}
+                                    {showAnnotationIds && (
+                                        <Text
+                                            x={ann.x + ann.width - 30}
+                                            y={ann.y + 2}
+                                            text={`#${String(ann.id || '').slice(0, 4)}`}
+                                            fontSize={10}
+                                            fill="#ffffff"
+                                            opacity={annotationOpacity * 0.8}
+                                            listening={false}
+                                        />
+                                    )}
+                                </>
+                            )}
+                            </React.Fragment>
                         );
                     })}
 
@@ -884,6 +1129,20 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                     )}
                 </Layer>
             </Stage>
+            
+            {/* Mini Map */}
+            {getSetting('showMiniMap', true) && imageDimensions.width > 0 && imageDimensions.height > 0 && (
+                <MiniMap
+                    imageUrl={imageUrl}
+                    annotations={annotations}
+                    classes={classes}
+                    stageScale={stageScale}
+                    stagePos={stagePos}
+                    stageSize={stageSize}
+                    imageDimensions={imageDimensions}
+                    onNavigate={handleMinimapNavigate}
+                />
+            )}
         </div>
     );
 };

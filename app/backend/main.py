@@ -487,7 +487,10 @@ except ImportError:
 
 class ExportRequest(BaseModel):
     dataset_path: str
-    format: str # coco, voc
+    format: str # coco, voc, yolo
+    apply_filters: bool = False
+    filter_class_id: int = None
+    filter_annotated: bool = None
 
 @app.post("/export")
 def export_dataset_endpoint(data: ExportRequest):

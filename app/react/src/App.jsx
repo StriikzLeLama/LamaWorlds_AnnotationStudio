@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import { Settings } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
 import AnnotationCanvas from './components/AnnotationCanvas';
 import StatsPanel from './components/StatsPanel';
 import ValidationPanel from './components/ValidationPanel';
+import AnalyticsPanel from './components/AnalyticsPanel';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
+import SettingsPanel from './components/SettingsPanel';
 import { useUndoRedo } from './hooks/useUndoRedo';
+import { useSettings, loadSettings } from './hooks/useSettings';
 import './styles/index.css';
 
 // Configure Axios
@@ -65,6 +69,12 @@ function App() {
     const [searchInAnnotations, setSearchInAnnotations] = useState(false); // Search in annotations toggle
     const [yoloModelPath, setYoloModelPath] = useState(''); // YOLO model path for pre-annotation
     const [yoloConfidence, setYoloConfidence] = useState(0.25); // YOLO confidence threshold
+    const [showSettings, setShowSettings] = useState(false); // Show settings panel
+    const [recentClasses, setRecentClasses] = useState([]); // Recent classes used
+    const [snapToGrid, setSnapToGrid] = useState(false); // Snap to grid state
+    
+    // Settings system
+    const { settings, updateSetting, updateSettings, getSetting } = useSettings();
     
     // Undo/Redo system - initialize with empty array
     const undoRedoHook = useUndoRedo([]);
@@ -227,6 +237,18 @@ function App() {
         };
     }, []);
 
+    // Ensure currentImageIndex is valid when images are loaded
+    useEffect(() => {
+        if (Array.isArray(images) && images.length > 0) {
+            if (currentImageIndex < 0 || currentImageIndex >= images.length) {
+                console.log('Fixing invalid currentImageIndex:', currentImageIndex, '-> 0');
+                setCurrentImageIndex(0);
+            }
+        } else if (images.length === 0) {
+            setCurrentImageIndex(-1);
+        }
+    }, [images, currentImageIndex]);
+
     // Save state whenever relevant values change
     useEffect(() => {
         if (datasetPath) {
@@ -354,6 +376,39 @@ function App() {
                 }
                 
                 setSaveStatus('Saved');
+                
+                // Auto-advance if enabled - use setCurrentImageIndex directly to avoid circular dependency
+                if (getSetting('autoAdvance', false) && validAnnotations.length > 0) {
+                    const delay = getSetting('autoAdvanceDelay', 500);
+                    setTimeout(() => {
+                        // Find next unannotated image
+                        const nextUnannotated = images.findIndex((img, idx) => 
+                            idx > currentImageIndex && !annotatedImages.has(img)
+                        );
+                        if (nextUnannotated >= 0) {
+                            setCurrentImageIndex(nextUnannotated);
+                        } else if (currentImageIndex < images.length - 1) {
+                            // If no unannotated, just go to next
+                            setCurrentImageIndex(currentImageIndex + 1);
+                        }
+                    }, delay);
+                }
+                
+                // Update recent classes
+                if (validAnnotations.length > 0 && getSetting('showRecentClasses', true)) {
+                    const usedClassIds = [...new Set(validAnnotations.map(a => a.class_id))];
+                    setRecentClasses(prev => {
+                        const newRecent = [...prev];
+                        usedClassIds.forEach(classId => {
+                            const index = newRecent.indexOf(classId);
+                            if (index >= 0) {
+                                newRecent.splice(index, 1);
+                            }
+                            newRecent.unshift(classId);
+                        });
+                        return newRecent.slice(0, getSetting('recentClassesCount', 5));
+                    });
+                }
             } catch (err) {
                 console.error("Failed to save", err);
                 setSaveStatus('Error');
@@ -369,7 +424,7 @@ function App() {
             saveDebounceTimer.current = setTimeout(performSave, 500);
             setSaveStatus('Saving...');
         }
-    }, [currentImageIndex, images, datasetPath, annotations, setUndoRedoState, autoSaveHistory]);
+    }, [currentImageIndex, images, datasetPath, annotations, setUndoRedoState, autoSaveHistory, getSetting, annotatedImages]);
     
     // Undo/Redo handlers
     const handleUndo = useCallback(() => {
@@ -1017,8 +1072,38 @@ function App() {
     const annotatedCount = images.filter((img) => annotatedImages.has(img)).length;
     const progress = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
 
+    // Debug: Log render
+    useEffect(() => {
+        console.log('App rendered', { 
+            imagesCount: images.length, 
+            currentIndex: currentImageIndex,
+            datasetPath,
+            loading,
+            backendError 
+        });
+    }, [images.length, currentImageIndex, datasetPath, loading, backendError]);
+
     return (
         <>
+        {/* Backend Error Banner */}
+        {backendError && (
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10000,
+                background: 'rgba(255, 0, 0, 0.9)',
+                color: 'white',
+                padding: '15px',
+                textAlign: 'center',
+                fontSize: '0.9rem',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+            }}>
+                <strong>Backend Error:</strong> {backendError}
+            </div>
+        )}
+        
         <div className="app-container" style={{ 
             display: isFullscreen ? 'none' : 'flex', 
             height: '100vh', 
@@ -1043,6 +1128,7 @@ function App() {
                 onChangeAnnotationClass={onChangeAnnotationClass}
                 onImportYaml={handleImportYaml}
                 annotations={annotations}
+                recentClasses={recentClasses}
                 onBatchDeleteClass={(classId) => {
                     const newAnns = annotations.filter(a => a.class_id !== classId);
                     saveAnnotations(newAnns, true, true); // Immediate save for batch operations
@@ -1150,14 +1236,16 @@ function App() {
                 setYoloConfidence={setYoloConfidence}
             />}
 
-            {/* Right Side Panels - Stats and Validation */}
+            {/* Right Side Panels - Stats, Analytics, and Validation */}
             {datasetPath && (
                 <div style={{ 
                     display: 'flex', 
                     flexDirection: 'column',
                     width: '250px',
                     margin: '10px',
-                    gap: '10px'
+                    gap: '10px',
+                    maxHeight: '100vh',
+                    overflowY: 'auto'
                 }}>
                     {/* Stats Panel */}
                     <StatsPanel 
@@ -1166,6 +1254,14 @@ function App() {
                         classes={classes} 
                         datasetPath={datasetPath} 
                         annotatedImages={annotatedImages} 
+                    />
+                    
+                    {/* Analytics Panel */}
+                    <AnalyticsPanel
+                        images={images}
+                        annotations={annotations}
+                        classes={classes}
+                        annotatedImages={annotatedImages}
                     />
                     
                     {/* Validation Panel */}
@@ -1234,6 +1330,25 @@ function App() {
                                 title="Keyboard Shortcuts (?)"
                             >
                                 <span>?</span> Help
+                            </button>
+                            <button
+                                onClick={() => setShowSettings(true)}
+                                style={{
+                                    background: 'rgba(0, 224, 255, 0.1)',
+                                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                                    borderRadius: '4px',
+                                    padding: '4px 8px',
+                                    color: '#00e0ff',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                                title="Settings"
+                            >
+                                <Settings size={14} />
+                                Settings
                             </button>
                             <div style={{ fontSize: '0.8rem', color: saveStatus === 'Error' ? '#ff4444' : '#00ff00', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
                                 {saveStatus}
@@ -1397,36 +1512,46 @@ function App() {
                             }}></div>
                             <div>Loading...</div>
                         </div>
-                    ) : images.length > 0 && currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] ? (
-                        <AnnotationCanvas
-                            imageUrl={images[currentImageIndex]}
-                            annotations={annotations}
-                            onChange={saveAnnotations}
-                            selectedClassId={selectedClassId}
-                            classes={classes}
-                            selectedId={selectedAnnotationId}
-                            onSelect={setSelectedAnnotationId}
-                            selectedIds={selectedAnnotationIds}
-                            onSelectMultiple={setSelectedAnnotationIds}
-                            showAnnotations={showAnnotations}
-                            onZoomToSelection={selectedAnnotationId || selectedAnnotationIds.size > 0}
-                            isFullscreen={isFullscreen}
-                            onToggleFullscreen={() => setIsFullscreen(prev => !prev)}
-                        />
+                    ) : images.length > 0 ? (
+                        // Ensure currentImageIndex is valid
+                        (currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex]) ? (
+                            <AnnotationCanvas
+                                imageUrl={images[currentImageIndex]}
+                                annotations={annotations}
+                                onChange={saveAnnotations}
+                                selectedClassId={selectedClassId}
+                                classes={classes}
+                                selectedId={selectedAnnotationId}
+                                onSelect={setSelectedAnnotationId}
+                                selectedIds={selectedAnnotationIds}
+                                onSelectMultiple={setSelectedAnnotationIds}
+                                showAnnotations={showAnnotations}
+                                onZoomToSelection={selectedAnnotationId || selectedAnnotationIds.size > 0}
+                                isFullscreen={isFullscreen}
+                                onToggleFullscreen={() => setIsFullscreen(prev => !prev)}
+                            />
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#00e0ff', gap: '20px' }}>
+                                <div style={{ fontSize: '3rem' }}>🖼️</div>
+                                <div style={{ fontSize: '1.2rem' }}>No image selected</div>
+                                <button 
+                                    className="btn-primary"
+                                    onClick={() => {
+                                        if (images.length > 0) {
+                                            setCurrentImageIndex(0);
+                                        }
+                                    }}
+                                    style={{ padding: '8px 16px', marginTop: '10px' }}
+                                >
+                                    Load First Image
+                                </button>
+                            </div>
+                        )
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#555', gap: '20px' }}>
-                            {images.length === 0 ? (
-                                <>
-                                    <div style={{ fontSize: '3rem' }}>📁</div>
-                                    <div style={{ fontSize: '1.2rem' }}>No images loaded</div>
-                                    <div style={{ fontSize: '0.9rem', color: '#666' }}>Click "Open Dataset Folder" to get started</div>
-                                </>
-                            ) : (
-                                <>
-                                    <div style={{ fontSize: '3rem' }}>🖼️</div>
-                                    <div style={{ fontSize: '1.2rem' }}>No image selected</div>
-                                </>
-                            )}
+                            <div style={{ fontSize: '3rem' }}>📁</div>
+                            <div style={{ fontSize: '1.2rem' }}>No images loaded</div>
+                            <div style={{ fontSize: '0.9rem', color: '#666' }}>Click "Open Dataset Folder" to get started</div>
                         </div>
                     )}
                 </div>
@@ -1547,6 +1672,11 @@ function App() {
                         alert('Please open a dataset first');
                         return;
                     }
+                    
+                    // Check if multi-format export is enabled
+                    const exportMultiple = getSetting('exportMultipleFormats', false);
+                    const exportFormats = getSetting('exportFormats', ['yolo']);
+                    const exportWithFilters = getSetting('exportWithFilters', false);
                     
                     // Export/Import project
                     if (format === 'project') {
@@ -1674,14 +1804,54 @@ function App() {
                                 `Report saved to: ${res.data.file}`;
                             alert(reportText);
                         } else {
-                            const res = await api.post('/export', {
-                                dataset_path: datasetPath,
-                                format: format
-                            });
-                            if (format === 'coco') {
-                                alert(`Exported to: ${res.data.file}`);
+                            // Handle multi-format export
+                            const formatsToExport = exportMultiple && exportFormats.length > 0 
+                                ? exportFormats 
+                                : [format];
+                            
+                            const exportResults = [];
+                            
+                            for (const exportFormat of formatsToExport) {
+                                try {
+                                    const res = await api.post('/export', {
+                                        dataset_path: datasetPath,
+                                        format: exportFormat,
+                                        apply_filters: exportWithFilters,
+                                        filter_class_id: exportWithFilters ? filterClassId : null,
+                                        filter_annotated: exportWithFilters ? filterAnnotated : null
+                                    });
+                                    
+                                    exportResults.push({
+                                        format: exportFormat,
+                                        success: true,
+                                        file: res.data.file,
+                                        dir: res.data.dir,
+                                        count: res.data.count
+                                    });
+                                } catch (err) {
+                                    console.error(`Failed to export ${exportFormat}:`, err);
+                                    exportResults.push({
+                                        format: exportFormat,
+                                        success: false,
+                                        error: err.response?.data?.detail || err.message || "Export failed"
+                                    });
+                                }
+                            }
+                            
+                            // Show results
+                            const successCount = exportResults.filter(r => r.success).length;
+                            if (successCount === exportResults.length) {
+                                const message = exportResults.length === 1
+                                    ? (exportResults[0].file 
+                                        ? `Exported to: ${exportResults[0].file}`
+                                        : `Exported ${exportResults[0].count} files to: ${exportResults[0].dir}`)
+                                    : `Successfully exported ${successCount} format(s)`;
+                                alert(message);
                             } else {
-                                alert(`Exported ${res.data.count} files to: ${res.data.dir}`);
+                                const failed = exportResults.filter(r => !r.success);
+                                alert(`Export completed with errors:\n\n` +
+                                    `Success: ${successCount}/${exportResults.length}\n` +
+                                    `Failed: ${failed.map(f => `${f.format}: ${f.error}`).join('\n')}`);
                             }
                         }
                     } catch (err) {
@@ -1696,6 +1866,20 @@ function App() {
             
             {/* Keyboard Shortcuts Help */}
             {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+            
+            {/* Settings Panel */}
+            {showSettings && (
+                <SettingsPanel
+                    settings={settings}
+                    updateSetting={updateSetting}
+                    updateSettings={updateSettings}
+                    resetSettings={() => {
+                        const defaultSettings = loadSettings();
+                        updateSettings(defaultSettings);
+                    }}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
         </div>
         
         {/* Fullscreen Canvas */}

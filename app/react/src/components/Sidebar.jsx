@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings } from 'lucide-react';
 
-function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence }) {
+function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence, recentClasses = [] }) {
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
