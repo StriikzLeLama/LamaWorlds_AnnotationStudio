@@ -23,7 +23,7 @@
         "react",
         "fastapi"
     ],
-    "author": "Antigravity",
+    "author": "StriikzLeLama",
     "license": "MIT",
     "devDependencies": {
         "concurrently": "^8.2.2",

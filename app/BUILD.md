@@ -1,149 +1,151 @@
-# Guide de compilation en .exe
+# Build Guide for .exe
 
-## Prérequis
+## Prerequisites
 
-1. **Node.js** installé (v20+)
-2. **Python 3.10+** installé sur le système
-3. **npm** installé
+1. **Node.js** installed (v20+)
+2. **Python 3.10+** installed on the system
+3. **npm** installed
 
-## Étapes de compilation
+## Build Steps
 
-### 1. Installer les dépendances (si pas déjà fait)
+### 1. Install dependencies (if not already done)
 
 ```bash
 npm install
 ```
 
-### 2. Compiler le frontend React
+### 2. Build React frontend
 
 ```bash
 npm run build
 ```
 
-Cette commande compile React avec Vite et crée le dossier `dist/`.
+This command compiles React with Vite and creates the `dist/` folder.
 
-### 3. Compiler l'application Electron
+### 3. Build Electron application
 
 ```bash
 npm run build:win
 ```
 
-Ou pour une compilation complète :
+Or for a complete build:
 
 ```bash
 npm run build:app
 ```
 
-## Résultat
+## Result
 
-Le fichier `.exe` sera créé dans le dossier `release/` :
-- `Lama Worlds Annotation Studio-1.0.0-Setup.exe` (installateur NSIS)
+The `.exe` file will be created in the `release/` folder:
+- `Lama Worlds Annotation Studio-1.0.0-Setup.exe` (NSIS installer)
 
-## Installation Python requise
+## Python Installation Required
 
-⚠️ **Important** : L'application nécessite Python installé sur le système cible.
+⚠️ **Important**: The application requires Python installed on the target system.
 
-L'utilisateur doit avoir :
-- Python 3.10+ installé
-- Les dépendances Python installées : `pip install -r requirements.txt`
+The user must have:
+- Python 3.10+ installed
+- Python dependencies installed: `pip install -r requirements.txt`
 
-### Mode Développement (Recommandé)
+### Development Mode (Recommended)
 
-Pour éviter les problèmes de détection de Python en mode build, vous pouvez utiliser le mode développement :
+To avoid Python detection issues in build mode, you can use development mode:
 
 ```bash
 npm run dev
 ```
 
-Cette commande démarre automatiquement :
-- Le backend Python (FastAPI) sur le port 8000
-- Le serveur Vite (React) sur le port 5173
-- L'application Electron
+This command automatically starts:
+- Python backend (FastAPI) on port 8000
+- Vite server (React) on port 5173
+- Electron application
 
-**Avantages du mode dev :**
-- ✅ Détection Python automatique et fiable
-- ✅ Hot-reload pour le développement
-- ✅ Logs détaillés en temps réel
-- ✅ Pas de problème de PATH
-- ✅ Performance optimale avec optimisations React
+**Development mode advantages:**
+- ✅ Automatic and reliable Python detection
+- ✅ Hot-reload for development
+- ✅ Detailed real-time logs
+- ✅ No PATH issues
+- ✅ Optimal performance with React optimizations
 
-### Mode Production (Build)
+### Production Mode (Build)
 
-Pour créer un .exe, suivez les étapes ci-dessus, mais notez que :
-- L'utilisateur final doit avoir Python installé
-- Les dépendances doivent être installées avec `install-backend-deps.bat`
-- La détection de Python peut être problématique selon l'environnement
+To create an .exe, follow the steps above, but note that:
+- The end user must have Python installed
+- Dependencies must be installed with `install-backend-deps.bat`
+- Python detection may be problematic depending on the environment
 
-### Option 1 : Installer Python automatiquement
+### Option 1: Install Python automatically
 
-Pour inclure Python dans l'installateur, vous pouvez utiliser un script d'installation personnalisé.
+To include Python in the installer, you can use a custom installation script.
 
-### Option 2 : Créer un launcher qui vérifie Python
+### Option 2: Create a launcher that checks Python
 
-L'application vérifie automatiquement si Python est installé au démarrage.
+The application automatically checks if Python is installed on startup.
 
-## Structure du build
+## Build Structure
 
 ```
 release/
 ├── Lama Worlds Annotation Studio-1.0.0-Setup.exe
-└── win-unpacked/ (dossier de développement)
+└── win-unpacked/ (development folder)
 ```
 
 ## Notes
 
-- Le build inclut le backend Python mais **pas** l'interpréteur Python
-- L'utilisateur final doit installer Python séparément
-- Pour un build autonome, considérez PyInstaller pour le backend
-- L'application est optimisée pour les performances avec React.memo, useCallback et useMemo
+- The build includes the Python backend but **not** the Python interpreter
+- The end user must install Python separately
+- For a standalone build, consider PyInstaller for the backend
+- The application is optimized for performance with React.memo, useCallback, and useMemo
+- To use Vision LLM with GGUF models, install `llama-cpp-python`: `pip install llama-cpp-python`
+- Python dependencies are listed in `requirements.txt`
 
-## Dépannage
+## Troubleshooting
 
-### Erreur : "dist folder not found"
-→ Exécutez `npm run build` d'abord
+### Error: "dist folder not found"
+→ Run `npm run build` first
 
-### Erreur : "electron-builder not found"
-→ Exécutez `npm install`
+### Error: "electron-builder not found"
+→ Run `npm install`
 
-### Build trop volumineux
-→ Normal, Electron inclut Chromium (~100-200 MB)
+### Build too large
+→ Normal, Electron includes Chromium (~100-200 MB)
 
-### Erreur réseau lors de l'ouverture de fichier ou import YAML
+### Network error when opening file or importing YAML
 
-Si vous obtenez une erreur réseau ("Network Error" ou "ECONNREFUSED") dans l'application compilée :
+If you get a network error ("Network Error" or "ECONNREFUSED") in the compiled application:
 
-1. **Vérifiez que Python est installé** :
-   - Python 3.7+ doit être installé et accessible dans votre PATH
-   - Téléchargez depuis : https://www.python.org/downloads/
-   - Lors de l'installation, cochez "Add Python to PATH"
+1. **Check that Python is installed**:
+   - Python 3.7+ must be installed and accessible in your PATH
+   - Download from: https://www.python.org/downloads/
+   - During installation, check "Add Python to PATH"
 
-2. **Installez les dépendances Python** :
+2. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
-   Ou si vous avez l'app compilée, naviguez vers `resources/backend` et exécutez :
+   Or if you have the compiled app, navigate to `resources/backend` and run:
    ```bash
-   pip install fastapi uvicorn pillow numpy opencv-python python-multipart watchdog pyyaml
+   pip install fastapi uvicorn pillow numpy opencv-python python-multipart watchdog pyyaml requests llama-cpp-python
    ```
 
-3. **Vérifiez les logs du backend** :
-   - La console de l'application devrait afficher les messages de démarrage du backend
-   - Si vous voyez des erreurs sur des modules manquants, installez-les avec pip
+3. **Check backend logs**:
+   - The application console should display backend startup messages
+   - If you see errors about missing modules, install them with pip
 
-4. **Vérifiez que le backend démarre** :
-   - Le backend devrait démarrer automatiquement au lancement de l'application
-   - Vérifiez la console pour le message "Backend is ready!"
+4. **Check that the backend starts**:
+   - The backend should start automatically when the application launches
+   - Check the console for the "Backend is ready!" message
 
-5. **Vérifiez le port 8000** :
-   - Le backend utilise le port 8000 par défaut
-   - Assurez-vous qu'aucune autre application n'utilise ce port
+5. **Check port 8000**:
+   - The backend uses port 8000 by default
+   - Make sure no other application is using this port
 
-## Optimisations incluses
+## Included Optimizations
 
-L'application inclut plusieurs optimisations de performance :
-- **React.memo** pour éviter les re-renders inutiles
-- **useCallback** pour mémoriser les fonctions
-- **useMemo** pour mémoriser les calculs coûteux
-- **Cache intelligent** des annotations
-- **Lazy loading** des images
-- **Centrage automatique** des images pour meilleure UX
+The application includes several performance optimizations:
+- **React.memo** to avoid unnecessary re-renders
+- **useCallback** to memoize functions
+- **useMemo** to memoize expensive calculations
+- **Smart annotation cache**
+- **Lazy loading** of images
+- **Automatic centering** of images for better UX

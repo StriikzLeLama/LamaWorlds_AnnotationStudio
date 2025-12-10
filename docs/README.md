@@ -1,282 +1,307 @@
 # 🦙 Lama Worlds Annotation Studio
 
-Un outil d'annotation d'images moderne et puissant pour les datasets YOLO, avec une interface utilisateur élégante et des fonctionnalités avancées.
+A modern and powerful image annotation tool for YOLO datasets, with an elegant user interface and advanced features.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
-## ✨ Fonctionnalités
+## ✨ Features
 
-### 🎨 Interface Moderne
-- **Interface sombre** avec design néon futuriste
-- **Canvas interactif** avec zoom, pan, rotation et flip
-- **Miniatures d'images** avec aperçu des annotations
-- **Vue grille et liste** pour navigation rapide
-- **Mode plein écran** pour focus maximal
-- **Barre de progression** pour suivre votre travail
-- **Panel de statistiques** en temps réel
-- **Panneau de validation** intégré
+### 🎨 Modern Interface
+- **Dark interface** with futuristic neon design
+- **Interactive canvas** with zoom, pan, rotation, and flip
+- **Image thumbnails** with annotation preview
+- **Grid and list views** for quick navigation
+- **Fullscreen mode** for maximum focus
+- **Progress bar** to track your work
+- **Real-time statistics panel**
+- **Integrated validation panel**
 
-### 📝 Annotation Avancée
-- **Annotations rectangulaires** (format YOLO)
-- **Système de classes** personnalisables avec couleurs
-- **Sélection multiple** avec drag rectangle et Ctrl+clic
-- **Opérations en lot** (supprimer toutes les annotations d'une classe)
-- **Duplication d'annotations** (Ctrl+D)
-- **Commentaires sur annotations** pour notes personnelles
-- **Validation automatique** des annotations (erreurs, warnings, doublons)
-- **Pré-annotation YOLO** avec modèle personnalisé
-- **Zoom intelligent** sur sélection (touche Z)
+### 📝 Advanced Annotation
+- **Rectangular annotations** (YOLO format)
+- **Customizable class system** with colors
+- **Multiple selection** with drag rectangle and Ctrl+click
+- **Batch operations** (delete all annotations of a class)
+- **Annotation duplication** (Ctrl+D)
+- **Comments on annotations** for personal notes
+- **Automatic validation** of annotations (errors, warnings, duplicates)
+- **YOLO pre-annotation** with custom model
+- **Smart zoom** on selection (Z key)
 
-### 🔍 Navigation & Recherche
-- **Recherche d'images** en temps réel
-- **Recherche dans annotations** (classes, commentaires, tags)
-- **Filtres avancés** : Toutes / Annotées / Vides / Par classe
-- **Navigation intelligente** : prochaine image non annotée (N)
-- **Historique de navigation** (Alt+←/→)
-- **Navigation clavier** complète (flèches, Home/End)
-- **Raccourcis clavier** complets et personnalisables
+### 🔍 Navigation & Search
+- **Image search** in real-time
+- **Search in annotations** (classes, comments, tags)
+- **Advanced filters**: All / Annotated / Empty / By class
+- **Smart navigation**: next unannotated image (N)
+- **Navigation history** (Alt+←/→)
+- **Complete keyboard navigation** (arrows, Home/End)
+- **Complete and customizable keyboard shortcuts**
 
-### 💾 Gestion de Projet
-- **Sauvegarde automatique** de l'état
-- **Restauration** au redémarrage
-- **Export/Import de projets complets** (backup/restore)
-- **Import YAML** des classes (format YOLO)
-- **Export COCO** et **Pascal VOC**
-- **Templates de classes** (sauvegarde/chargement)
-- **Tags/métadonnées** pour images
-- **Cache intelligent** pour performance optimale
-- **Historique par image** des modifications
+### 💾 Project Management
+- **Automatic state saving**
+- **Restore on restart**
+- **Export/Import complete projects** (backup/restore)
+- **Import YAML classes** (YOLO format)
+- **Export COCO** and **Pascal VOC**
+- **Class templates** (save/load)
+- **Tags/metadata** for images
+- **Smart cache** for optimal performance
+- **Per-image modification history**
 
-### 🚀 Performance & Qualité
-- **Optimisations avancées** (React.memo, useCallback, useMemo)
-- **Centrage automatique** des images au chargement
-- **Lazy loading** des images
-- **Cache des annotations**
-- **Validation de qualité** en temps réel
-- **Rapports statistiques** détaillés
-- **Performance fluide** même avec grandes datasets
+### 🚀 Performance & Quality
+- **Advanced optimizations** (React.memo, useCallback, useMemo)
+- **Automatic image centering** on load
+- **Lazy loading** of images
+- **Annotation cache**
+- **Real-time quality validation**
+- **Detailed statistical reports**
+- **Smooth performance** even with large datasets
 
-### 🎯 Fonctionnalités Spéciales
-- **Pré-annotation avec YOLO** : Chargez un modèle YOLO pour pré-annoter automatiquement
-- **Mode plein écran** : Focus total sur l'annotation (F11)
-- **Vue grille** : Navigation visuelle rapide avec aperçu des annotations
-- **Statistiques détaillées** : Progression du dataset, annotations par classe, moyennes
-- **Validation automatique** : Détection d'erreurs, warnings et doublons
-- **Export de rapports** : Statistiques complètes du dataset
+### 🎯 Special Features
+- **YOLO pre-annotation**: Load a YOLO model to automatically pre-annotate
+- **Vision LLM Assistant**: Integration with vision LLM models (OpenAI, Claude, GGUF) to verify, annotate, and automatically modify annotations
+- **Fullscreen mode**: Total focus on annotation (F11)
+- **Grid view**: Fast visual navigation with annotation preview
+- **Detailed statistics**: Dataset progress, annotations by class, averages
+- **Automatic validation**: Error, warning, and duplicate detection
+- **Report export**: Complete dataset statistics
+- **Advanced filters**: Filter by size, position, aspect ratio of annotations
+- **Annotation measurements**: Display dimensions and distances in real-time
+- **Annotation templates**: Save and reuse annotation configurations
+- **Annotation groups**: Group and manipulate multiple annotations together
+- **Collapsible panels**: Customizable interface with collapsible panels
 
-## 📋 Prérequis
+## 📋 Prerequisites
 
-- **Node.js** 20+ ([Télécharger](https://nodejs.org/))
-- **Python** 3.10+ ([Télécharger](https://www.python.org/downloads/))
-- **npm** (inclus avec Node.js)
+- **Node.js** 20+ ([Download](https://nodejs.org/))
+- **Python** 3.10+ ([Download](https://www.python.org/downloads/))
+- **npm** (included with Node.js)
 
 ## 🛠️ Installation
 
-### 1. Cloner ou télécharger le projet
+### 1. Clone or download the project
 
 ```bash
 cd app
 ```
 
-### 2. Installer les dépendances Node.js
+### 2. Install Node.js dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Installer les dépendances Python
+### 3. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 🎮 Utilisation
+## 🎮 Usage
 
-### Mode Développement
+### Development Mode
 
 ```bash
 npm run dev
 ```
 
-Cette commande démarre automatiquement :
-- Le backend Python (FastAPI) sur le port 8000
-- Le serveur Vite (React) sur le port 5173
-- L'application Electron
+This command automatically starts:
+- Python backend (FastAPI) on port 8000
+- Vite server (React) on port 5173
+- Electron application
 
-### Mode Production
+### Production Mode
 
 ```bash
 npm start
 ```
 
-## 📦 Compilation en .exe
+## 📦 Building to .exe
 
-### Compilation rapide
+### Quick Build
 
 ```bash
 npm run build:win
 ```
 
-### Étapes détaillées
+### Detailed Steps
 
-1. **Compiler le frontend React** :
+1. **Build React frontend**:
    ```bash
    npm run build
    ```
 
-2. **Créer l'installateur Windows** :
+2. **Create Windows installer**:
    ```bash
    npm run build:win
    ```
 
-Le fichier `.exe` sera créé dans le dossier `release/` :
+The `.exe` file will be created in the `release/` folder:
 - `Lama Worlds Annotation Studio-1.0.0-Setup.exe`
 
-> 📖 Pour plus de détails, consultez [BUILD.md](../app/BUILD.md) ou [QUICK_BUILD.md](../app/QUICK_BUILD.md)
+> 📖 For more details, see [BUILD.md](../app/BUILD.md)
 
-## 🎯 Guide d'utilisation
+## 🎯 Usage Guide
 
-### Ouvrir un Dataset
+### Open a Dataset
 
-1. Cliquez sur **"Open Dataset Folder"**
-2. Sélectionnez le dossier contenant vos images
-3. L'application détecte automatiquement la structure :
-   - `images/` - Dossier des images
-   - `labels/` - Dossier des annotations (créé automatiquement)
-   - `classes.txt` - Fichier des classes (créé automatiquement)
+1. Click on **"Open Dataset Folder"**
+2. Select the folder containing your images
+3. The application automatically detects the structure:
+   - `images/` - Image folder
+   - `labels/` - Annotation folder (created automatically)
+   - `classes.txt` - Class file (created automatically)
 
-### Annoter une Image
+### Annotate an Image
 
-1. **Sélectionner une classe** dans la sidebar gauche
-2. **Dessiner un rectangle** sur l'image avec la souris
-3. L'annotation est **sauvegardée automatiquement**
+1. **Select a class** in the left sidebar
+2. **Draw a rectangle** on the image with the mouse
+3. The annotation is **automatically saved**
 
-### Modifier une Annotation
+### Modify an Annotation
 
-- **Cliquer** sur une annotation pour la sélectionner
-- **Ctrl+Clic** pour sélection multiple
-- **Drag rectangle** pour sélection multiple
-- **Glisser** pour déplacer
-- **Redimensionner** avec les poignées
-- **Changer la classe** avec les touches 1-9 ou via le menu
-- **Dupliquer** avec Ctrl+D
-- **Supprimer** avec la touche `Delete` ou le bouton ×
-- **Ajouter un commentaire** via le panneau de droite
+- **Click** on an annotation to select it
+- **Ctrl+Click** for multiple selection
+- **Drag rectangle** for multiple selection
+- **Drag** to move
+- **Resize** with handles
+- **Change class** with keys 1-9 or via menu
+- **Duplicate** with Ctrl+D
+- **Delete** with `Delete` key or × button
+- **Add a comment** via the right panel
 
-### Pré-annotation YOLO
+### YOLO Pre-annotation
 
-1. Dans la sidebar, section **"YOLO Pre-annotation"**
-2. Entrez le chemin vers votre modèle YOLO (.pt ou .onnx)
-3. Définissez le seuil de confiance (0.0 - 1.0)
-4. Cliquez sur **"Load Model"** puis **"Pre-annotate"**
-5. Les annotations seront générées automatiquement
+1. In the sidebar, **"YOLO Pre-annotation"** section
+2. Enter the path to your YOLO model (.pt or .onnx)
+3. Set the confidence threshold (0.0 - 1.0)
+4. Click on **"Load Model"** then **"Pre-annotate"**
+5. Annotations will be automatically generated
 
-### Navigation Intelligente
+### Vision LLM Assistant
 
-- **N** : Prochaine image non annotée
-- **Shift+N** : Image précédente non annotée
-- **Alt+←** : Retour dans l'historique
-- **Alt+→** : Avancer dans l'historique
-- **Home/End** : Première/Dernière image
+1. Click on **"Vision LLM Assistant"** in the sidebar
+2. Select the mode: **Verify** (verify), **Annotate** (create), or **Modify** (improve)
+3. Choose your provider: OpenAI, Claude, GGUF (local model), or Custom API
+4. Configure image filters (by status, class, max number)
+5. Click on **"Start"** to launch processing
+6. Track progress in real-time with the loading bar
+7. Review results and apply them if necessary
 
-### Raccourcis Clavier Complets
+**Vision LLM Features:**
+- **Verification**: Analyze all images and annotations, returns a confidence score (0-100%)
+- **Automatic annotation**: Creates annotations for all filtered images
+- **Modification**: Improves and corrects existing annotations
+- **Advanced filters**: Process only images that match your criteria
+- **GGUF support**: Use local models (.gguf) for offline processing
+
+### Smart Navigation
+
+- **N**: Next unannotated image
+- **Shift+N**: Previous unannotated image
+- **Alt+←**: Back in history
+- **Alt+→**: Forward in history
+- **Home/End**: First/Last image
+
+### Complete Keyboard Shortcuts
 
 #### Navigation
-| Raccourci | Action |
-|-----------|--------|
-| `←` / `→` | Naviguer entre les images |
-| `Home` / `End` | Aller à la première/dernière image |
-| `N` | Prochaine image non annotée |
-| `Shift+N` | Image précédente non annotée |
-| `Alt+←` / `Alt+→` | Historique de navigation (retour/avancer) |
+| Shortcut | Action |
+|----------|--------|
+| `←` / `→` | Navigate between images |
+| `Home` / `End` | Go to first/last image |
+| `N` | Next unannotated image |
+| `Shift+N` | Previous unannotated image |
+| `Alt+←` / `Alt+→` | Navigation history (back/forward) |
 
 #### Annotation
-| Raccourci | Action |
-|-----------|--------|
-| `Click & Drag` | Dessiner une nouvelle annotation |
-| `Click` | Sélectionner une annotation |
-| `Ctrl+Click` | Sélection multiple |
-| `Drag Rectangle` | Sélection multiple par zone |
-| `Ctrl+A` | Sélectionner toutes les annotations |
-| `Delete` / `Backspace` | Supprimer l'annotation sélectionnée |
-| `1-9` | Changer la classe de l'annotation sélectionnée |
-| `Ctrl+D` | Dupliquer l'annotation sélectionnée |
-| `T` | Masquer/Afficher les annotations |
-| `Z` | Zoom intelligent sur sélection |
+| Shortcut | Action |
+|----------|--------|
+| `Click & Drag` | Draw a new annotation |
+| `Click` | Select an annotation |
+| `Ctrl+Click` | Multiple selection |
+| `Drag Rectangle` | Multiple selection by area |
+| `Ctrl+A` | Select all annotations |
+| `Delete` / `Backspace` | Delete selected annotation |
+| `1-9` | Change class of selected annotation |
+| `Ctrl+D` | Duplicate selected annotation |
+| `T` | Hide/Show annotations |
+| `Z` | Smart zoom on selection |
 
-#### Édition
-| Raccourci | Action |
-|-----------|--------|
-| `Ctrl+Z` | Annuler |
-| `Ctrl+Y` | Refaire |
-| `Ctrl+C` | Copier l'annotation sélectionnée |
-| `Ctrl+V` | Coller l'annotation |
+#### Editing
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy selected annotation |
+| `Ctrl+V` | Paste annotation |
 
 #### Canvas
-| Raccourci | Action |
-|-----------|--------|
-| `Ctrl + / -` | Zoom avant/arrière |
-| `Ctrl+0` | Réinitialiser le zoom |
-| `Molette` | Zoomer |
-| `Middle Click` / `Shift+Drag` | Pan (déplacer la vue) |
-| `R` | Rotation horaire |
-| `Shift+R` | Rotation anti-horaire |
-| `H` | Retourner horizontalement |
-| `V` | Retourner verticalement |
-| `F11` | Mode plein écran |
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + / -` | Zoom in/out |
+| `Ctrl+0` | Reset zoom |
+| `Mouse Wheel` | Zoom |
+| `Middle Click` / `Shift+Drag` | Pan (move view) |
+| `R` | Clockwise rotation |
+| `Shift+R` | Counter-clockwise rotation |
+| `H` | Flip horizontally |
+| `V` | Flip vertically |
+| `F11` | Fullscreen mode |
+| `Q` | Toggle Quick Draw Mode |
+| `M` | Show/Hide measurements |
 
-#### Aide
-| Raccourci | Action |
-|-----------|--------|
-| `?` / `F1` | Afficher/Masquer l'aide des raccourcis |
+#### Help
+| Shortcut | Action |
+|----------|--------|
+| `?` / `F1` | Show/Hide shortcut help |
 
-### Gestion des Classes
+### Class Management
 
-- **Ajouter une classe** : Cliquez sur "+" dans la sidebar
-- **Modifier une classe** : Double-cliquez sur le nom
-- **Changer la couleur** : Cliquez sur le carré de couleur
-- **Supprimer une classe** : Cliquez sur × (supprime aussi toutes ses annotations)
-- **Importer depuis YAML** : Bouton "Import YAML"
-- **Sauvegarder template** : Bouton "Save Template"
-- **Charger template** : Bouton "Load Template"
+- **Add a class**: Click on "+" in the sidebar
+- **Edit a class**: Double-click on the name
+- **Change color**: Click on the color square
+- **Delete a class**: Click on × (also deletes all its annotations)
+- **Import from YAML**: "Import YAML" button
+- **Save template**: "Save Template" button
+- **Load template**: "Load Template" button
 
-### Tags et Métadonnées
+### Tags and Metadata
 
-- **Ajouter des tags** : Cliquez sur l'icône tag dans la liste d'images
-- **Rechercher par tag** : Utilisez la recherche avec "tag:nom_du_tag"
-- **Tags multiples** : Séparez par des virgules
+- **Add tags**: Click on the tag icon in the image list
+- **Search by tag**: Use search with "tag:tag_name"
+- **Multiple tags**: Separate by commas
 
-### Export/Import de Projet
+### Project Export/Import
 
-- **Export complet** : Menu → Export Project (sauvegarde tout : images, annotations, classes, tags, commentaires)
-- **Import complet** : Menu → Import Project (restaure un projet complet)
+- **Complete export**: Menu → Export Project (saves everything: images, annotations, classes, tags, comments)
+- **Complete import**: Menu → Import Project (restores a complete project)
 
-### Importer des Classes depuis YAML
+### Import Classes from YAML
 
-1. Cliquez sur **"Import YAML"** dans la sidebar
-2. Sélectionnez votre fichier `data.yaml` (format YOLO)
-3. Choisissez de **remplacer** ou **fusionner** avec les classes existantes
+1. Click on **"Import YAML"** in the sidebar
+2. Select your `data.yaml` file (YOLO format)
+3. Choose to **replace** or **merge** with existing classes
 
-### Exporter le Dataset
+### Export Dataset
 
-1. Cliquez sur **"EXPORT COCO"** ou **"EXPORT VOC"** dans le panneau de droite
-2. Le fichier sera créé dans le dossier du dataset
+1. Click on **"EXPORT COCO"** or **"EXPORT VOC"** in the right panel
+2. The file will be created in the dataset folder
 
-### Export de Rapports Statistiques
+### Statistical Report Export
 
-1. Cliquez sur **"Export Report"** dans le panneau de statistiques
-2. Un rapport détaillé sera généré avec :
-   - Progression du dataset
-   - Statistiques par classe
-   - Images annotées/non annotées
-   - Moyennes et totaux
+1. Click on **"Export Report"** in the statistics panel
+2. A detailed report will be generated with:
+   - Dataset progress
+   - Statistics by class
+   - Annotated/unannotated images
+   - Averages and totals
 
-## 📁 Structure du Dataset
+## 📁 Dataset Structure
 
 ```
-mon_dataset/
+my_dataset/
 ├── images/
 │   ├── image1.jpg
 │   ├── image2.jpg
@@ -288,28 +313,28 @@ mon_dataset/
 └── classes.txt
 ```
 
-### Format YOLO
+### YOLO Format
 
-Chaque fichier `.txt` dans `labels/` contient :
+Each `.txt` file in `labels/` contains:
 ```
 class_id x_center y_center width height
 ```
 
-Où toutes les valeurs sont normalisées entre 0 et 1.
+Where all values are normalized between 0 and 1.
 
 ## 🏗️ Architecture
 
 ```
 app/
-├── backend/          # Backend Python (FastAPI)
-│   ├── main.py      # API principale
-│   ├── models.py    # Modèles Pydantic
-│   ├── yolo_handler.py  # Gestion format YOLO
-│   └── exporter.py  # Export COCO/VOC
-├── electron/        # Application Electron
-│   ├── main.js     # Processus principal
-│   └── preload.js  # Bridge sécurité
-├── react/          # Frontend React
+├── backend/          # Python Backend (FastAPI)
+│   ├── main.py      # Main API
+│   ├── models.py    # Pydantic models
+│   ├── yolo_handler.py  # YOLO format handling
+│   └── exporter.py  # COCO/VOC export
+├── electron/        # Electron Application
+│   ├── main.js     # Main process
+│   └── preload.js  # Security bridge
+├── react/          # React Frontend
 │   └── src/
 │       ├── App.jsx
 │       ├── components/
@@ -321,85 +346,104 @@ app/
 │       │   └── KeyboardShortcuts.jsx
 │       └── hooks/
 │           └── useUndoRedo.js
-├── dist/           # Build React (généré)
-└── release/        # Build Electron (généré)
+├── dist/           # React Build (generated)
+└── release/        # Electron Build (generated)
 ```
 
-## 🔧 Technologies Utilisées
+## 🔧 Technologies Used
 
-- **Frontend** : React 18, Vite, Konva, Framer Motion
-- **Backend** : FastAPI, Python 3.10+
-- **Desktop** : Electron 28
-- **Styling** : CSS moderne avec effets glassmorphism
-- **Performance** : React.memo, useCallback, useMemo pour optimisations
+- **Frontend**: React 18, Vite, Konva, Framer Motion
+- **Backend**: FastAPI, Python 3.10+, Uvicorn
+- **Desktop**: Electron 28
+- **Styling**: Modern CSS with glassmorphism effects
+- **Performance**: React.memo, useCallback, useMemo for optimizations
+- **Vision LLM**: Support for OpenAI GPT-4 Vision, Claude, GGUF (llama-cpp-python)
+- **Python Dependencies**: FastAPI, Uvicorn, Pillow, NumPy, OpenCV, PyYAML, Requests, llama-cpp-python
 
-## 📝 Scripts Disponibles
+## 📝 Available Scripts
 
-| Commande | Description |
-|----------|-------------|
-| `npm run dev` | Démarrer en mode développement |
-| `npm start` | Démarrer l'application |
-| `npm run build` | Compiler le frontend React |
-| `npm run build:win` | Créer l'installateur Windows |
-| `npm run build:app` | Build complet (frontend + installer) |
-| `npm run electron` | Lancer Electron seul |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start in development mode |
+| `npm start` | Start the application |
+| `npm run build` | Build React frontend |
+| `npm run build:win` | Create Windows installer |
+| `npm run build:app` | Complete build (frontend + installer) |
+| `npm run electron` | Launch Electron alone |
+| `npm run diagnose` | Diagnose Python configuration |
 
-## 🐛 Dépannage
+## 📦 Dependencies
 
-### L'application ne démarre pas
+### Python Dependencies (requirements.txt)
+- `fastapi` - Web framework for API
+- `uvicorn` - ASGI server
+- `pillow` - Image processing
+- `numpy` - Numerical computations
+- `opencv-python` - Computer vision
+- `python-multipart` - Multipart/form-data support
+- `watchdog` - File monitoring
+- `pyyaml` - YAML parsing
+- `requests` - HTTP requests (for Vision LLM)
+- `llama-cpp-python` - GGUF model support (optional)
 
-1. Vérifiez que Python est installé : `python --version`
-2. Vérifiez que les dépendances Python sont installées : `pip install -r requirements.txt`
-3. Vérifiez que les dépendances Node.js sont installées : `npm install`
+## 🐛 Troubleshooting
 
-### Le backend ne démarre pas
+### Application won't start
 
-- Vérifiez que le port 8000 n'est pas utilisé
-- Vérifiez les logs dans la console
+1. Check that Python is installed: `python --version`
+2. Check that Python dependencies are installed: `pip install -r requirements.txt`
+3. Check that Node.js dependencies are installed: `npm install`
 
-### Les images ne s'affichent pas
+### Backend won't start
 
-- Vérifiez que les chemins des images sont corrects
-- Vérifiez que les images sont dans le bon format (jpg, png, etc.)
+- Check that port 8000 is not in use
+- Check the logs in the console
 
-### Erreur lors de la compilation
+### Images don't display
 
-- Assurez-vous d'avoir exécuté `npm run build` avant `npm run build:win`
-- Vérifiez que tous les fichiers sont présents
+- Check that image paths are correct
+- Check that images are in the correct format (jpg, png, etc.)
 
-### Performance lente
+### Build error
 
-- L'application est optimisée pour de grandes datasets
-- Utilisez le cache des annotations (activé par défaut)
-- Fermez les autres applications pour libérer de la mémoire
+- Make sure you ran `npm run build` before `npm run build:win`
+- Check that all files are present
 
-## 🤝 Contribution
+### Slow performance
 
-Les contributions sont les bienvenues ! N'hésitez pas à :
-- Signaler des bugs
-- Proposer des fonctionnalités
-- Soumettre des pull requests
+- The application is optimized for large datasets
+- Use annotation cache (enabled by default)
+- Close other applications to free up memory
 
-## 📄 Licence
+## 🤝 Contributing
 
-MIT License - Voir le fichier LICENSE pour plus de détails
+Contributions are welcome! Feel free to:
+- Report bugs
+- Propose features
+- Submit pull requests
 
-## 👤 Auteur
+## 📄 License
 
-**Antigravity**
+This project is licensed under the **MIT License**. See the [LICENSE](../LICENSE) file for details.
 
-## 🙏 Remerciements
+**MIT License** - You are free to use, modify, and distribute this software provided you include the copyright notice and license in all copies.
 
-- YOLO pour le format d'annotation
-- La communauté open-source pour les outils utilisés
+## 👤 Author
+
+**StriikzLeLama**
+
+## 🙏 Acknowledgments
+
+- YOLO for the annotation format
+- The open-source community for the tools used
 
 ## 📞 Support
 
-Pour toute question ou problème :
-1. Vérifiez la documentation dans `BUILD.md` et `QUICK_BUILD.md`
-2. Consultez les issues GitHub (si applicable)
-3. Vérifiez les logs dans la console
+For questions or issues:
+1. Check the documentation in `BUILD.md` and `QUICK_BUILD.md`
+2. Check GitHub issues (if applicable)
+3. Check the console logs
 
 ---
 
-**Fait avec ❤️ pour la communauté ML/AI**
+**Made with ❤️ for the ML/AI community**

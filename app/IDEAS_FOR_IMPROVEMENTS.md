@@ -1,234 +1,253 @@
-# 💡 Idées d'Améliorations pour Lama Worlds Annotation Studio
+# 💡 Improvement Ideas for Lama Worlds Annotation Studio
 
-## 🚀 Fonctionnalités de Productivité
+## ✅ Implemented Features
 
-### 1. **Quick Draw Mode (Mode Dessin Rapide)**
-- Mode où on peut dessiner plusieurs annotations rapidement sans avoir à sélectionner la classe à chaque fois
-- La classe reste sélectionnée jusqu'à ce qu'on appuie sur Escape
-- Raccourci clavier pour activer/désactiver
+- ✅ **Quick Draw Mode** - Rapid drawing mode with persistent class
+- ✅ **Advanced Filters** - Filtering by size, position, aspect ratio
+- ✅ **Annotation Groups** - Grouping and manipulation of annotations
+- ✅ **Real-time Statistics Dashboard** - Dashboard with real-time statistics
+- ✅ **Customizable Workspace** - Collapsible panels and customizable interface
+- ✅ **Annotation Templates** - Save and reuse annotation configurations
+- ✅ **Smart Alignment** - Alignment and distribution of annotations
+- ✅ **Annotation Measurements** - Display dimensions and distances
+- ✅ **Keyboard Shortcuts Customization** - Customizable keyboard shortcuts
+- ✅ **Export with Preview** - Preview before export
+- ✅ **Multi-Format Export** - Simultaneous export in multiple formats
+- ✅ **Incremental Save** - Incremental saving with history
+- ✅ **Vision LLM Assistant** - Integration with vision LLM models (OpenAI, Claude, GGUF)
+- ✅ **Annotation Comments** - Comments on annotations
+- ✅ **Image Tags** - Tag/metadata system for images
+- ✅ **Collapsible Panels** - Collapsible panels to optimize space
 
-### 2. **Templates d'Annotations**
-- Sauvegarder des configurations d'annotations (positions, tailles) comme templates
-- Réutiliser des templates sur d'autres images
-- Utile pour des objets qui apparaissent toujours aux mêmes positions relatives
+## 🚀 Productivity Features
 
-### 3. **Smart Paste (Paste Intelligent)**
-- Coller des annotations en ajustant automatiquement leur position pour éviter les chevauchements
-- Option pour coller au centre de l'image
-- Option pour coller avec un offset intelligent
+### 1. **Quick Draw Mode (Rapid Drawing Mode)**
+- Mode where you can draw multiple annotations quickly without having to select the class each time
+- The class stays selected until you press Escape
+- Keyboard shortcut to enable/disable
+
+### 2. **Annotation Templates**
+- Save annotation configurations (positions, sizes) as templates
+- Reuse templates on other images
+- Useful for objects that always appear at the same relative positions
+
+### 3. **Smart Paste (Intelligent Paste)**
+- Paste annotations by automatically adjusting their position to avoid overlaps
+- Option to paste at image center
+- Option to paste with intelligent offset
 
 ### 4. **Batch Annotation Tools**
-- Sélectionner plusieurs images et appliquer la même annotation à toutes
-- Copier les annotations d'une image vers plusieurs autres
-- Changer la classe de toutes les annotations d'un type sur plusieurs images
+- Select multiple images and apply the same annotation to all
+- Copy annotations from one image to multiple others
+- Change the class of all annotations of a type across multiple images
 
 ### 5. **Annotation Templates Library**
-- Bibliothèque de templates d'annotations réutilisables
-- Catégories de templates (personnes, véhicules, objets, etc.)
-- Import/Export de templates
+- Library of reusable annotation templates
+- Template categories (people, vehicles, objects, etc.)
+- Import/Export templates
 
-## 🎯 Fonctionnalités d'Annotation Avancées
+## 🎯 Advanced Annotation Features
 
-### 6. **Multi-Point Selection (Sélection Multi-Points)**
-- Sélectionner plusieurs annotations en dessinant un rectangle
-- Sélection par classe (sélectionner toutes les annotations d'une classe)
-- Sélection par zone (sélectionner toutes les annotations dans une zone)
+### 6. **Multi-Point Selection (Multi-Point Selection)**
+- Select multiple annotations by drawing a rectangle
+- Selection by class (select all annotations of a class)
+- Selection by area (select all annotations in an area)
 
-### 7. **Annotation Groups (Groupes d'Annotations)**
-- Grouper des annotations ensemble
-- Déplacer/redimensionner un groupe comme une seule entité
-- Utile pour des objets composés de plusieurs parties
+### 7. **Annotation Groups (Annotation Groups)**
+- Group annotations together
+- Move/resize a group as a single entity
+- Useful for objects composed of multiple parts
 
-### 8. **Smart Alignment (Alignement Intelligent)**
-- Alignement automatique basé sur des règles (aligner à gauche, centrer, distribuer)
-- Alignement relatif (aligner par rapport à une annotation de référence)
-- Grille magnétique pour l'alignement
+### 8. **Smart Alignment (Intelligent Alignment)**
+- Automatic alignment based on rules (align left, center, distribute)
+- Relative alignment (align relative to a reference annotation)
+- Magnetic grid for alignment
 
-### 9. **Annotation Measurements (Mesures)**
-- Afficher les dimensions des annotations (largeur x hauteur)
-- Calculer les distances entre annotations
-- Afficher les coordonnées précises
+### 9. **Annotation Measurements (Measurements)**
+- Display annotation dimensions (width x height)
+- Calculate distances between annotations
+- Display precise coordinates
 
 ### 10. **Annotation Validation Suggestions**
-- Suggestions automatiques pour corriger les annotations invalides
-- Détection de chevauchements avec suggestions de correction
-- Détection d'annotations trop petites/grandes avec alertes
+- Automatic suggestions to correct invalid annotations
+- Overlap detection with correction suggestions
+- Detection of annotations that are too small/large with alerts
 
-## 📊 Fonctionnalités d'Analyse
+## 📊 Analysis Features
 
 ### 11. **Real-time Statistics Dashboard**
-- Tableau de bord avec statistiques en temps réel
-- Graphiques de distribution des classes
-- Évolution du nombre d'annotations au fil du temps
+- Dashboard with real-time statistics
+- Class distribution charts
+- Evolution of annotation count over time
 
 ### 12. **Annotation Heatmap**
-- Carte de chaleur montrant où les annotations sont concentrées
-- Utile pour identifier les zones d'intérêt dans le dataset
+- Heat map showing where annotations are concentrated
+- Useful for identifying areas of interest in the dataset
 
 ### 13. **Class Distribution Analysis**
-- Analyse de la distribution des classes
-- Détection de déséquilibres de classes
-- Suggestions pour équilibrer le dataset
+- Class distribution analysis
+- Detection of class imbalances
+- Suggestions to balance the dataset
 
 ### 14. **Quality Metrics**
-- Métriques de qualité des annotations (complétude, cohérence)
-- Score de qualité par image
-- Rapports de qualité détaillés
+- Annotation quality metrics (completeness, consistency)
+- Quality score per image
+- Detailed quality reports
 
-## 🔍 Fonctionnalités de Recherche et Filtrage
+## 🔍 Search and Filtering Features
 
 ### 15. **Advanced Filters**
-- Filtrer par taille d'annotation (min/max width/height)
-- Filtrer par position (zone spécifique de l'image)
-- Filtrer par ratio largeur/hauteur
-- Filtrer par date de modification
+- Filter by annotation size (min/max width/height)
+- Filter by position (specific area of the image)
+- Filter by width/height ratio
+- Filter by modification date
 
 ### 16. **Smart Search**
-- Recherche sémantique dans les annotations
-- Recherche par similarité visuelle
-- Recherche par patterns (trouver des annotations similaires)
+- Semantic search in annotations
+- Search by visual similarity
+- Search by patterns (find similar annotations)
 
 ### 17. **Image Comparison Mode**
-- Comparer deux images côte à côte
-- Comparer les annotations entre images
-- Mode diff pour voir les différences
+- Compare two images side by side
+- Compare annotations between images
+- Diff mode to see differences
 
-## 🎨 Fonctionnalités d'Interface
+## 🎨 Interface Features
 
 ### 18. **Customizable Workspace**
-- Panneaux redimensionnables et réorganisables
-- Sauvegarder/charger des layouts de workspace
-- Mode compact pour les petits écrans
+- Resizable and reorganizable panels
+- Save/load workspace layouts
+- Compact mode for small screens
 
 ### 19. **Annotation Preview on Hover**
-- Aperçu des annotations au survol dans la liste d'images
-- Tooltip avec informations détaillées
-- Preview rapide sans charger l'image complète
+- Annotation preview on hover in image list
+- Tooltip with detailed information
+- Quick preview without loading the full image
 
 ### 20. **Multi-Monitor Support**
-- Support pour plusieurs écrans
-- Déplacer des panneaux sur d'autres écrans
-- Mode plein écran amélioré
+- Support for multiple screens
+- Move panels to other screens
+- Improved fullscreen mode
 
 ### 21. **Dark/Light Theme Toggle**
-- Thème clair/sombre
-- Thèmes personnalisables
-- Auto-switch basé sur l'heure
+- Light/dark theme
+- Customizable themes
+- Auto-switch based on time
 
-## 🔧 Fonctionnalités Techniques
+## 🔧 Technical Features
 
 ### 22. **Incremental Save**
-- Sauvegarde incrémentale (seulement les changements)
-- Historique de versions par image
-- Restauration à une version précédente
+- Incremental saving (only changes)
+- Version history per image
+- Restore to a previous version
 
 ### 23. **Offline Mode**
-- Fonctionner sans connexion backend
-- Synchronisation automatique quand la connexion revient
-- Cache local des annotations
+- Work without backend connection
+- Automatic synchronization when connection returns
+- Local annotation cache
 
 ### 24. **Keyboard Shortcuts Customization**
-- Personnalisation complète des raccourcis clavier
-- Profils de raccourcis (mode rapide, mode précis)
-- Import/Export de configurations de raccourcis
+- Complete keyboard shortcut customization
+- Shortcut profiles (fast mode, precise mode)
+- Import/Export shortcut configurations
 
 ### 25. **Plugin System**
-- Système de plugins pour étendre les fonctionnalités
-- API pour créer des plugins personnalisés
-- Marketplace de plugins
+- Plugin system to extend functionality
+- API to create custom plugins
+- Plugin marketplace
 
-## 📤 Fonctionnalités d'Export/Import
+## 📤 Export/Import Features
 
 ### 26. **Export with Preview**
-- Aperçu avant export
-- Options d'export avancées (compression, format, etc.)
-- Export progressif (pour gros datasets)
+- Preview before export
+- Advanced export options (compression, format, etc.)
+- Progressive export (for large datasets)
 
 ### 27. **Multi-Format Export**
-- Export simultané en plusieurs formats
-- Export avec transformations (redimensionnement, rotation)
-- Export avec filtres appliqués
+- Simultaneous export in multiple formats
+- Export with transformations (resizing, rotation)
+- Export with applied filters
 
 ### 28. **Import from Other Tools**
-- Importer depuis LabelImg, CVAT, etc.
-- Conversion automatique de formats
-- Validation lors de l'import
+- Import from LabelImg, CVAT, etc.
+- Automatic format conversion
+- Validation on import
 
-## 🤖 Fonctionnalités IA/ML
+## 🤖 AI/ML Features
 
 ### 29. **Smart Suggestions**
-- Suggestions d'annotations basées sur les annotations précédentes
-- Apprentissage des patterns de l'utilisateur
-- Auto-complétion intelligente
+- Annotation suggestions based on previous annotations
+- Learning user patterns
+- Intelligent auto-completion
 
 ### 30. **Active Learning**
-- Suggérer les images les plus utiles à annoter
-- Prioriser les images difficiles ou importantes
-- Optimiser le workflow d'annotation
+- Suggest the most useful images to annotate
+- Prioritize difficult or important images
+- Optimize annotation workflow
 
 ### 31. **Annotation Quality Prediction**
-- Prédire la qualité des annotations
-- Détecter les annotations suspectes
-- Suggestions d'amélioration
+- Predict annotation quality
+- Detect suspicious annotations
+- Improvement suggestions
 
-## 🎮 Fonctionnalités de Workflow
+## 🎮 Workflow Features
 
 ### 32. **Annotation Workflow States**
-- États pour les images (à annoter, en cours, validé, rejeté)
-- Workflow personnalisable
-- Assignation de tâches (si multi-utilisateur)
+- States for images (to annotate, in progress, validated, rejected)
+- Customizable workflow
+- Task assignment (if multi-user)
 
 ### 33. **Collaboration Features**
-- Mode multi-utilisateur
-- Partage de projets
-- Commentaires et révisions
+- Multi-user mode
+- Project sharing
+- Comments and reviews
 
 ### 34. **Progress Tracking**
-- Suivi détaillé de la progression
-- Estimations de temps restant
-- Statistiques de productivité
+- Detailed progress tracking
+- Time remaining estimates
+- Productivity statistics
 
-## 🔐 Fonctionnalités de Sécurité
+## 🔐 Security Features
 
 ### 35. **Project Encryption**
-- Chiffrement des projets
-- Protection par mot de passe
-- Sauvegarde sécurisée
+- Project encryption
+- Password protection
+- Secure backup
 
 ### 36. **Audit Log**
-- Journal des modifications
-- Qui a fait quoi et quand
-- Historique complet des actions
+- Modification log
+- Who did what and when
+- Complete action history
 
-## 📱 Fonctionnalités Multi-Plateforme
+## 📱 Multi-Platform Features
 
 ### 37. **Touch Support**
-- Support tactile pour tablettes
-- Gestes pour rotation/zoom
-- Interface adaptée aux écrans tactiles
+- Touch support for tablets
+- Gestures for rotation/zoom
+- Touchscreen-adapted interface
 
 ### 38. **Mobile Companion App**
-- Application mobile pour visualiser les annotations
-- Synchronisation avec le projet principal
-- Notifications de progression
+- Mobile app to view annotations
+- Synchronization with main project
+- Progress notifications
 
-## 🎯 Priorités Suggérées
+## 🎯 Suggested Priorities
 
-### Haute Priorité (Impact Élevé, Effort Modéré)
-1. Quick Draw Mode
-2. Advanced Filters
-3. Annotation Groups
-4. Real-time Statistics Dashboard
-5. Customizable Workspace
+### High Priority (High Impact, Moderate Effort)
+1. ~~Quick Draw Mode~~ ✅ Implemented
+2. ~~Advanced Filters~~ ✅ Implemented
+3. ~~Annotation Groups~~ ✅ Implemented
+4. ~~Real-time Statistics Dashboard~~ ✅ Implemented
+5. ~~Customizable Workspace~~ ✅ Implemented
 
-### Moyenne Priorité (Impact Modéré, Effort Modéré)
-6. Templates d'Annotations
-7. Smart Alignment
-8. Annotation Measurements
-9. Multi-Format Export amélioré
-10. Keyboard Shortcuts Customization
+### Medium Priority (Moderate Impact, Moderate Effort)
+6. ~~Annotation Templates~~ ✅ Implemented
+7. ~~Smart Alignment~~ ✅ Implemented
+8. ~~Annotation Measurements~~ ✅ Implemented
+9. ~~Multi-Format Export improved~~ ✅ Implemented
+10. ~~Keyboard Shortcuts Customization~~ ✅ Implemented
 
-### Basse Priorité (Impact Variable, Effort Élevé)
+### Low Priority (Variable Impact, High Effort)
 11. Plugin System
 12. Multi-User Collaboration
 13. Mobile Companion App
@@ -237,8 +256,7 @@
 
 ## 💭 Notes
 
-- Certaines fonctionnalités peuvent être combinées
-- L'ordre de priorité dépend des besoins spécifiques
-- Les fonctionnalités IA/ML nécessitent une intégration backend plus complexe
-- Les fonctionnalités de collaboration nécessitent une architecture serveur
-
+- Some features can be combined
+- Priority order depends on specific needs
+- AI/ML features require more complex backend integration
+- Collaboration features require a server architecture
