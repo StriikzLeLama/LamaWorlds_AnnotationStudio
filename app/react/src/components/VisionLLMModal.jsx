@@ -564,10 +564,54 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                                 </div>
                             )}
                         </div>
+                        
+                        {/* Detailed Results - Show confidence breakdown for annotations */}
+                        {mode === 'annotate' && results.annotations && results.annotations.length > 0 && (
+                            <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <h4 style={{ color: '#00e0ff', marginBottom: '10px', fontSize: '0.95rem' }}>Annotation Details</h4>
+                                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                    {results.annotations.map((annData, idx) => {
+                                        if (!annData.annotations || annData.annotations.length === 0) return null;
+                                        const avgConfidence = annData.annotations.reduce((sum, ann) => sum + (ann.confidence || 1.0), 0) / annData.annotations.length;
+                                        const minConfidence = Math.min(...annData.annotations.map(ann => ann.confidence || 1.0));
+                                        const maxConfidence = Math.max(...annData.annotations.map(ann => ann.confidence || 1.0));
+                                        return (
+                                            <div key={idx} style={{ 
+                                                padding: '8px', 
+                                                marginBottom: '8px', 
+                                                background: 'rgba(255,255,255,0.05)', 
+                                                borderRadius: '6px',
+                                                fontSize: '0.8rem'
+                                            }}>
+                                                <div style={{ color: '#aaa', marginBottom: '4px', wordBreak: 'break-all' }}>
+                                                    {annData.image_path?.split(/[/\\]/).pop() || `Image ${idx + 1}`}
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                                    <span style={{ color: '#888' }}>{annData.annotations.length} annotation(s)</span>
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <span style={{ color: '#888', fontSize: '0.75rem' }}>Avg:</span>
+                                                        <span style={{ 
+                                                            color: avgConfidence >= 0.7 ? '#00ff00' : avgConfidence >= 0.5 ? '#ffaa00' : '#ff4444',
+                                                            fontWeight: 'bold'
+                                                        }}>
+                                                            {(avgConfidence * 100).toFixed(1)}%
+                                                        </span>
+                                                        <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                                                            ({Math.round(minConfidence * 100)}-{Math.round(maxConfidence * 100)}%)
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        
                         {!autoApply && (mode === 'annotate' || mode === 'modify') && (
                             <button
                                 className="btn-primary"
-                                style={{ width: '100%', padding: '10px', fontSize: '0.9rem' }}
+                                style={{ width: '100%', padding: '10px', fontSize: '0.9rem', marginTop: '15px' }}
                                 onClick={applyResults}
                             >
                                 Apply Results

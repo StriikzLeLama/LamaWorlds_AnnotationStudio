@@ -373,9 +373,26 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                         </option>
                                     ))}
                                 </select>
-                                <span style={{ color: '#666', fontSize: '0.8rem', marginRight: '8px', minWidth: '40px' }}>
-                                    {Math.round((ann.confidence || 1.0) * 100)}%
-                                </span>
+                                {ann.confidence !== undefined && ann.confidence < 1.0 && (
+                                    <span 
+                                        style={{ 
+                                            fontSize: '0.75rem', 
+                                            marginRight: '8px', 
+                                            minWidth: '45px',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: ann.confidence >= 0.7 ? 'rgba(0, 255, 0, 0.2)' : ann.confidence >= 0.5 ? 'rgba(255, 170, 0, 0.2)' : 'rgba(255, 68, 68, 0.2)',
+                                            color: ann.confidence >= 0.7 ? '#00ff00' : ann.confidence >= 0.5 ? '#ffaa00' : '#ff4444',
+                                            fontWeight: 'bold',
+                                            border: `1px solid ${ann.confidence >= 0.7 ? '#00ff00' : ann.confidence >= 0.5 ? '#ffaa00' : '#ff4444'}`,
+                                            textAlign: 'center',
+                                            display: 'inline-block'
+                                        }}
+                                        title={`Confidence: ${(ann.confidence * 100).toFixed(1)}%`}
+                                    >
+                                        {Math.round((ann.confidence || 1.0) * 100)}%
+                                    </span>
+                                )}
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();

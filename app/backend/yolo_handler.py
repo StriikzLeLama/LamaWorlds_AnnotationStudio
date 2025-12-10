@@ -22,9 +22,15 @@ def parse_yolo_file(file_path):
                 y_center = float(parts[2])
                 width = float(parts[3])
                 height = float(parts[4])
+                # Confidence is optional (6th value), default to 1.0 for manual annotations
                 conf = 1.0
                 if len(parts) > 5:
-                    conf = float(parts[5])
+                    try:
+                        conf = float(parts[5])
+                        # Ensure confidence is between 0 and 1
+                        conf = max(0.0, min(1.0, conf))
+                    except (ValueError, IndexError):
+                        conf = 1.0
                 
                 boxes.append({
                     "id": f"box_{i}",
@@ -44,8 +50,13 @@ def parse_yolo_file(file_path):
 def save_yolo_file(file_path, boxes):
     lines = []
     for box in boxes:
-        # YOLO format: class x_center y_center width height
-        line = f"{box['class_id']} {box['x']} {box['y']} {box['width']} {box['height']}\n"
+        # YOLO format: class x_center y_center width height [confidence]
+        # Include confidence if it's less than 1.0 (to save space for manual annotations)
+        confidence = box.get('confidence', 1.0)
+        if confidence < 1.0:
+            line = f"{box['class_id']} {box['x']} {box['y']} {box['width']} {box['height']} {confidence}\n"
+        else:
+            line = f"{box['class_id']} {box['x']} {box['y']} {box['width']} {box['height']}\n"
         lines.append(line)
         
     with open(file_path, 'w') as f:

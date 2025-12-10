@@ -1089,26 +1089,65 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                 <>
                                     {showAnnotationLabels && (
                                         <>
-                                            <Rect
-                                                x={ann.x}
-                                                y={Math.max(0, ann.y - 20)}
-                                                width={Math.max(60, classNameStr.length * 7)}
-                                                height={18}
-                                                fill="rgba(0, 0, 0, 0.7)"
-                                                stroke={classColor}
-                                                strokeWidth={1}
-                                                opacity={annotationOpacity}
-                                                listening={false}
-                                            />
-                                            <Text
-                                                x={ann.x + 4}
-                                                y={Math.max(0, ann.y - 18)}
-                                                text={classNameStr}
-                                                fontSize={12}
-                                                fill={classColor}
-                                                opacity={annotationOpacity}
-                                                listening={false}
-                                            />
+                                            {/* Label background - expand if confidence is shown */}
+                                            {ann.confidence !== undefined && ann.confidence < 1.0 ? (
+                                                <>
+                                                    <Rect
+                                                        x={ann.x}
+                                                        y={Math.max(0, ann.y - 20)}
+                                                        width={Math.max(100, classNameStr.length * 7 + 50)}
+                                                        height={18}
+                                                        fill="rgba(0, 0, 0, 0.7)"
+                                                        stroke={classColor}
+                                                        strokeWidth={1}
+                                                        opacity={annotationOpacity}
+                                                        listening={false}
+                                                    />
+                                                    <Text
+                                                        x={ann.x + 4}
+                                                        y={Math.max(0, ann.y - 18)}
+                                                        text={classNameStr}
+                                                        fontSize={12}
+                                                        fill={classColor}
+                                                        opacity={annotationOpacity}
+                                                        listening={false}
+                                                    />
+                                                    {/* Confidence percentage */}
+                                                    <Text
+                                                        x={ann.x + classNameStr.length * 7 + 8}
+                                                        y={Math.max(0, ann.y - 18)}
+                                                        text={`${Math.round((ann.confidence || 1.0) * 100)}%`}
+                                                        fontSize={11}
+                                                        fill={ann.confidence >= 0.7 ? '#00ff00' : ann.confidence >= 0.5 ? '#ffaa00' : '#ff4444'}
+                                                        opacity={annotationOpacity}
+                                                        listening={false}
+                                                        fontStyle="bold"
+                                                    />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Rect
+                                                        x={ann.x}
+                                                        y={Math.max(0, ann.y - 20)}
+                                                        width={Math.max(60, classNameStr.length * 7)}
+                                                        height={18}
+                                                        fill="rgba(0, 0, 0, 0.7)"
+                                                        stroke={classColor}
+                                                        strokeWidth={1}
+                                                        opacity={annotationOpacity}
+                                                        listening={false}
+                                                    />
+                                                    <Text
+                                                        x={ann.x + 4}
+                                                        y={Math.max(0, ann.y - 18)}
+                                                        text={classNameStr}
+                                                        fontSize={12}
+                                                        fill={classColor}
+                                                        opacity={annotationOpacity}
+                                                        listening={false}
+                                                    />
+                                                </>
+                                            )}
                                         </>
                                     )}
                                     {showAnnotationIds && (

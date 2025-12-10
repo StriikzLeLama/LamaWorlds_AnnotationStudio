@@ -372,12 +372,22 @@ def save_annotation_endpoint(data: AnnotationData):
                     validation_errors.append(f"Box {idx}: Normalized values out of range")
                     continue
 
+                # Preserve confidence if present in the box
+                confidence = 1.0
+                if hasattr(box, 'confidence') and box.confidence is not None:
+                    confidence = float(box.confidence)
+                    confidence = max(0.0, min(1.0, confidence))
+                elif isinstance(box, dict) and 'confidence' in box:
+                    confidence = float(box.get('confidence', 1.0))
+                    confidence = max(0.0, min(1.0, confidence))
+                
                 yolo_boxes.append({
                     "class_id": class_id_val,
                     "x": x_norm,
                     "y": y_norm,
                     "width": w_norm,
-                    "height": h_norm
+                    "height": h_norm,
+                    "confidence": confidence
                 })
             
             save_yolo_file(label_file, yolo_boxes)
@@ -999,20 +1009,25 @@ Only include annotations with confidence >= {request.confidence_threshold}."""
                         width = ann_data.get("width", 0.1)
                         height = ann_data.get("height", 0.1)
                         
-                        # Convert to pixel coordinates
-                        x = (x_center - width/2) * img_width
-                        y = (y_center - height/2) * img_height
-                        w = width * img_width
-                        h = height * img_height
-                        
-                        annotations.append({
-                            "class_id": int(ann_data.get("class_id", 0)),
-                            "x": x,
-                            "y": y,
-                            "width": w,
-                            "height": h,
-                            "confidence": ann_data.get("confidence", 0.5)
-                        })
+                # Convert to pixel coordinates
+                x = (x_center - width/2) * img_width
+                y = (y_center - height/2) * img_height
+                w = width * img_width
+                h = height * img_height
+                
+                # Get confidence, default to 0.5 if not provided
+                confidence = float(ann_data.get("confidence", 0.5))
+                # Ensure confidence is between 0 and 1
+                confidence = max(0.0, min(1.0, confidence))
+                
+                annotations.append({
+                    "class_id": int(ann_data.get("class_id", 0)),
+                    "x": x,
+                    "y": y,
+                    "width": w,
+                    "height": h,
+                    "confidence": confidence
+                })
                 
                 if annotations:
                     results["annotations"].append({
