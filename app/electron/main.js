@@ -963,3 +963,16 @@ ipcMain.handle('read-file', async (event, filePath) => {
         throw new Error(`Failed to read file: ${err.message}`);
     }
 });
+
+ipcMain.handle('show-open-dialog', async (event, options) => {
+    const result = await dialog.showOpenDialog(mainWindow, options || {
+        properties: ['openFile'],
+        filters: [
+            { name: 'All Files', extensions: ['*'] }
+        ]
+    });
+    return {
+        canceled: result.canceled,
+        filePaths: result.filePaths || []
+    };
+});

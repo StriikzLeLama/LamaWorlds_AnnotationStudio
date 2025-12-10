@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import CollapsiblePanel from './CollapsiblePanel';
 
 const API_URL = 'http://localhost:8000';
 const api = axios.create({ baseURL: API_URL, timeout: 10000 });
@@ -101,40 +102,37 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
     const errorCount = issues.filter(i => i.severity === 'error').length;
     const warningCount = issues.filter(i => i.severity === 'warning').length;
 
-    if (issues.length === 0 && !validating) {
-        return (
-            <div className="glass-panel" style={{
-                width: '100%',
-                padding: '15px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '100px'
-            }}>
-                <CheckCircle size={24} style={{ color: '#00ff00', marginBottom: '8px' }} />
-                <div style={{ color: '#00ff00', fontSize: '0.9rem', fontWeight: 'bold' }}>All Valid</div>
-                <div style={{ color: '#666', fontSize: '0.75rem', marginTop: '4px' }}>
-                    {annotations.length} annotation{annotations.length !== 1 ? 's' : ''} checked
-                </div>
-            </div>
-        );
-    }
+    const headerContent = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+            {issues.length === 0 && !validating ? (
+                <>
+                    <CheckCircle size={18} style={{ color: '#00ff00' }} />
+                    <span style={{ color: '#00ff00', fontSize: '0.85rem' }}>
+                        All Valid ({annotations.length} annotation{annotations.length !== 1 ? 's' : ''})
+                    </span>
+                </>
+            ) : (
+                <>
+                    <AlertTriangle size={18} style={{ color: errorCount > 0 ? '#ff4444' : '#ffaa00' }} />
+                    <span style={{ fontSize: '0.85rem' }}>
+                        {errorCount > 0 && `${errorCount} error${errorCount !== 1 ? 's' : ''}`}
+                        {errorCount > 0 && warningCount > 0 && ' • '}
+                        {warningCount > 0 && `${warningCount} warning${warningCount !== 1 ? 's' : ''}`}
+                    </span>
+                </>
+            )}
+        </div>
+    );
 
     return (
-        <div className="glass-panel" style={{
-            width: '100%',
-            padding: '15px',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '400px',
-            overflowY: 'auto'
-        }}>
+        <CollapsiblePanel 
+            title="Validation" 
+            icon={issues.length === 0 && !validating ? CheckCircle : AlertTriangle}
+            containerStyle={{ maxHeight: '400px', overflowY: 'auto' }}
+            headerStyle={{ marginBottom: 0 }}
+        >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertTriangle size={18} style={{ color: errorCount > 0 ? '#ff4444' : '#ffaa00' }} />
-                    <h4 className="neon-text" style={{ margin: 0, fontSize: '0.95rem' }}>Validation</h4>
-                </div>
+                {headerContent}
                 <button
                     onClick={validateAnnotations}
                     disabled={validating}
@@ -155,6 +153,21 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
                     Refresh
                 </button>
             </div>
+            
+            {issues.length === 0 && !validating ? (
+                <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    padding: '20px',
+                    color: '#666',
+                    fontSize: '0.85rem'
+                }}>
+                    No validation issues found
+                </div>
+            ) : (
+                <>
 
             {(errorCount > 0 || warningCount > 0) && (
                 <div style={{
@@ -233,7 +246,9 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
                     Last validated: {lastValidated.toLocaleTimeString()}
                 </div>
             )}
-        </div>
+                </>
+            )}
+        </CollapsiblePanel>
     );
 }
 

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { BarChart3, TrendingUp, PieChart, Activity } from 'lucide-react';
+import CollapsiblePanel from './CollapsiblePanel';
 
 function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
     // Calculate statistics
@@ -52,13 +53,9 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
     
     if (!stats) {
         return (
-            <div className="glass-panel" style={{ padding: '15px', margin: '10px' }}>
-                <h3 className="neon-text" style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart3 size={20} />
-                    Analytics
-                </h3>
+            <CollapsiblePanel title="Analytics" icon={BarChart3} containerStyle={{ margin: '10px' }}>
                 <div style={{ color: '#aaa', fontSize: '0.85rem' }}>No data available</div>
-            </div>
+            </CollapsiblePanel>
         );
     }
     
@@ -84,12 +81,11 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
     const maxCount = sortedClasses.length > 0 ? sortedClasses[0].count : 1;
     
     return (
-        <div className="glass-panel" style={{ padding: '15px', margin: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-            <h3 className="neon-text" style={{ marginTop: 0, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <BarChart3 size={20} />
-                Analytics
-            </h3>
-            
+        <CollapsiblePanel 
+            title="Analytics" 
+            icon={BarChart3}
+            containerStyle={{ margin: '10px', maxHeight: '400px', overflowY: 'auto' }}
+        >
             {/* Overview Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
                 <div style={{ background: 'rgba(0, 224, 255, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.3)' }}>
@@ -189,7 +185,7 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
                     {stats.annotatedCount} / {stats.totalImages} images annotated ({((stats.annotatedCount / stats.totalImages) * 100).toFixed(1)}%)
                 </div>
             </div>
-        </div>
+        </CollapsiblePanel>
     );
 }
 

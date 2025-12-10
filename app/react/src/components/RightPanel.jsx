@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag } from 'lucide-react';
+import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
@@ -17,6 +17,12 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
     const [showTagEditor, setShowTagEditor] = useState(false);
     const [tagEditorImage, setTagEditorImage] = useState(null);
     const [tagInput, setTagInput] = useState('');
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [filterMinSize, setFilterMinSize] = useState('');
+    const [filterMaxSize, setFilterMaxSize] = useState('');
+    const [filterMinRatio, setFilterMinRatio] = useState('');
+    const [filterMaxRatio, setFilterMaxRatio] = useState('');
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
         if (activeRef.current) {
@@ -73,6 +79,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
         if (!Array.isArray(classes) || typeof classId !== 'number') {
             return `Class ${classId || '?'}`;
         }
+        if (!Array.isArray(classes)) return `Class ${classId}`;
         const cls = classes.find(c => c && c.id === classId);
         return cls && cls.name ? cls.name : `Class ${classId}`;
     };
@@ -125,7 +132,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                 const searchLower = searchQuery.toLowerCase();
                 const matchesInAnnotations = cachedAnns.some(ann => {
                     if (!ann) return false;
-                    const cls = classes.find(c => c.id === ann.class_id);
+                    const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
                     const className = cls ? cls.name.toLowerCase() : '';
                     const comment = (annotationComments && annotationComments[ann.id]) ? annotationComments[ann.id].toLowerCase() : '';
                     return className.includes(searchLower) || comment.includes(searchLower);
@@ -191,7 +198,52 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                 }
             }
             
-            return matchesSearch && matchesFilter && matchesClass;
+            // Advanced filters: size and ratio
+            let matchesAdvanced = true;
+            if (showAdvancedFilters && (filterMinSize || filterMaxSize || filterMinRatio || filterMaxRatio)) {
+                if (annotationCache && annotationCache.current && annotationCache.current[img]) {
+                    const cachedAnns = annotationCache.current[img] || [];
+                    if (cachedAnns.length > 0) {
+                        // Check if any annotation matches the size/ratio filters
+                        matchesAdvanced = cachedAnns.some(ann => {
+                            if (!ann || typeof ann.width !== 'number' || typeof ann.height !== 'number') return false;
+                            
+                            const width = Math.abs(ann.width);
+                            const height = Math.abs(ann.height);
+                            const area = width * height;
+                            const ratio = width > 0 ? height / width : 0;
+                            
+                            // Size filter
+                            if (filterMinSize) {
+                                const minSize = parseFloat(filterMinSize);
+                                if (!isNaN(minSize) && area < minSize) return false;
+                            }
+                            if (filterMaxSize) {
+                                const maxSize = parseFloat(filterMaxSize);
+                                if (!isNaN(maxSize) && area > maxSize) return false;
+                            }
+                            
+                            // Ratio filter
+                            if (filterMinRatio) {
+                                const minRatio = parseFloat(filterMinRatio);
+                                if (!isNaN(minRatio) && ratio < minRatio) return false;
+                            }
+                            if (filterMaxRatio) {
+                                const maxRatio = parseFloat(filterMaxRatio);
+                                if (!isNaN(maxRatio) && ratio > maxRatio) return false;
+                            }
+                            
+                            return true;
+                        });
+                    } else {
+                        matchesAdvanced = false; // No annotations, doesn't match
+                    }
+                } else {
+                    matchesAdvanced = false; // No cache, can't filter
+                }
+            }
+            
+            return matchesSearch && matchesFilter && matchesClass && matchesAdvanced;
         });
         
         // Sort images
@@ -225,14 +277,64 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
     }, [filteredImages, images]);
 
     return (
-        <div className="glass-panel" style={{ width: '320px', margin: '10px', display: 'flex', flexDirection: 'column' }}>
+        <div className="glass-panel" style={{ 
+            width: '320px', 
+            margin: '10px', 
+            padding: isCollapsed ? '8px 15px' : '15px',
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'all 0.3s ease'
+        }}>
+            <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: isCollapsed ? 0 : '10px',
+                cursor: 'pointer',
+                userSelect: 'none',
+                borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                paddingBottom: isCollapsed ? 0 : '10px'
+            }}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+                <h4 className="neon-text" style={{ margin: 0 }}>Images & Annotations</h4>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCollapsed(!isCollapsed);
+                    }}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#00e0ff',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.background = 'transparent';
+                    }}
+                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+                >
+                    {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                </button>
+            </div>
 
+            {!isCollapsed && (
+                <>
             {/* Annotations List */}
             <div style={{ padding: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', height: '40%' }}>
-                <h4 className="neon-text" style={{ margin: '0 0 10px 0' }}>Annotations ({annotations.length})</h4>
+                <h4 className="neon-text" style={{ margin: '0 0 10px 0' }}>Annotations ({Array.isArray(annotations) ? annotations.length : 0})</h4>
                 <div style={{ height: 'calc(100% - 30px)', overflowY: 'auto' }}>
-                    {annotations.map((ann, i) => {
-                        const cls = classes.find(c => c.id === ann.class_id);
+                    {Array.isArray(annotations) && annotations.map((ann, i) => {
+                        const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
                         const isSelected = selectedAnnotationId === ann.id;
                         return (
                             <div 
@@ -260,20 +362,12 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     onClick={(e) => e.stopPropagation()}
                                     style={{
                                         flex: 1,
-                                        background: 'rgba(255, 255, 255, 0.05)',
-                                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                                        color: 'white',
-                                        padding: '4px 8px',
-                                        borderRadius: '4px',
                                         fontSize: '0.9rem',
-                                        cursor: 'pointer',
-                                        outline: 'none',
+                                        padding: '4px 8px',
                                         marginRight: '8px'
                                     }}
-                                    onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
-                                    onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                                 >
-                                    {classes.map(c => (
+                                    {Array.isArray(classes) && classes.map(c => (
                                         <option key={c.id} value={c.id} style={{ background: '#1a1a2e', color: 'white' }}>
                                             {c.name}
                                         </option>
@@ -306,7 +400,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                     })}
                     
                     {/* Annotation Comments */}
-                    {annotations.length > 0 && (
+                    {Array.isArray(annotations) && annotations.length > 0 && (
                         <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                             <h5 style={{ fontSize: '0.8rem', color: '#aaa', margin: '0 0 8px 0' }}>Comments</h5>
                             {annotations.filter(ann => annotationComments && annotationComments[ann.id]).map(ann => (
@@ -319,7 +413,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     color: '#aaa'
                                 }}>
                                     <div style={{ color: '#00e0ff', marginBottom: '2px' }}>
-                                        {classes.find(c => c.id === ann.class_id)?.name || 'Unknown'}
+                                        {Array.isArray(classes) ? (classes.find(c => c && c.id === ann.class_id)?.name || 'Unknown') : 'Unknown'}
                                     </div>
                                     <div>{annotationComments[ann.id]}</div>
                                 </div>
@@ -449,7 +543,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                         />
                     </div>
                     {/* Search options */}
-                    <div style={{ display: 'flex', gap: '4px', fontSize: '0.7rem' }}>
+                    <div style={{ display: 'flex', gap: '4px', fontSize: '0.7rem', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#aaa', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
@@ -459,7 +553,116 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             />
                             Search in annotations
                         </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#aaa', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={showAdvancedFilters}
+                                onChange={(e) => setShowAdvancedFilters(e.target.checked)}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            Advanced filters
+                        </label>
                     </div>
+                    
+                    {/* Advanced Filters */}
+                    {showAdvancedFilters && (
+                        <div style={{ 
+                            padding: '10px', 
+                            background: 'rgba(0, 224, 255, 0.05)', 
+                            borderRadius: '6px', 
+                            border: '1px solid rgba(0, 224, 255, 0.2)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            fontSize: '0.75rem'
+                        }}>
+                            <div style={{ fontWeight: 'bold', color: '#00e0ff', marginBottom: '4px' }}>Filter by Annotation Size:</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                <input
+                                    type="number"
+                                    placeholder="Min area (px²)"
+                                    value={filterMinSize}
+                                    onChange={(e) => setFilterMinSize(e.target.value)}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Max area (px²)"
+                                    value={filterMaxSize}
+                                    onChange={(e) => setFilterMaxSize(e.target.value)}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ fontWeight: 'bold', color: '#00e0ff', marginTop: '4px' }}>Filter by Aspect Ratio:</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="Min ratio (H/W)"
+                                    value={filterMinRatio}
+                                    onChange={(e) => setFilterMinRatio(e.target.value)}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="Max ratio (H/W)"
+                                    value={filterMaxRatio}
+                                    onChange={(e) => setFilterMaxRatio(e.target.value)}
+                                    style={{
+                                        padding: '4px 6px',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        fontSize: '0.75rem'
+                                    }}
+                                />
+                            </div>
+                            {(filterMinSize || filterMaxSize || filterMinRatio || filterMaxRatio) && (
+                                <button
+                                    onClick={() => {
+                                        setFilterMinSize('');
+                                        setFilterMaxSize('');
+                                        setFilterMinRatio('');
+                                        setFilterMaxRatio('');
+                                    }}
+                                    style={{
+                                        padding: '4px 8px',
+                                        background: 'rgba(255, 68, 68, 0.1)',
+                                        border: '1px solid rgba(255, 68, 68, 0.3)',
+                                        borderRadius: '4px',
+                                        color: '#ffaaaa',
+                                        cursor: 'pointer',
+                                        fontSize: '0.7rem'
+                                    }}
+                                >
+                                    Clear Filters
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                             <button
@@ -559,19 +762,14 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 disabled={loadingClassFilter}
                                 style={{
                                     width: '100%',
-                                    padding: '4px 8px',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    borderRadius: '4px',
-                                    color: 'white',
                                     fontSize: '0.75rem',
-                                    cursor: loadingClassFilter ? 'wait' : 'pointer',
-                                    outline: 'none',
-                                    opacity: loadingClassFilter ? 0.6 : 1
+                                    padding: '4px 8px',
+                                    opacity: loadingClassFilter ? 0.6 : 1,
+                                    cursor: loadingClassFilter ? 'wait' : 'pointer'
                                 }}
                             >
                                 <option value="">All Classes</option>
-                                {classes.map(cls => (
+                                {Array.isArray(classes) && classes.map(cls => (
                                     <option key={cls.id} value={cls.id} style={{ background: '#1a1a2e', color: 'white' }}>
                                         {cls.name}
                                     </option>
@@ -654,7 +852,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             }}
                                         />
                                         {/* Annotation overlay */}
-                                        {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && (
+                                        {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && Array.isArray(annotationCache.current[img]) && (
                                             <div style={{
                                                 position: 'absolute',
                                                 top: 0,
@@ -664,7 +862,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                 pointerEvents: 'none'
                                             }}>
                                                 {annotationCache.current[img].slice(0, 5).map((ann, annIdx) => {
-                                                    const cls = classes.find(c => c.id === ann.class_id);
+                                                    const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
                                                     if (!cls) return null;
                                                     return (
                                                         <div
@@ -847,7 +1045,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                         </div>
                                     )}
                                     {/* Draw annotation boxes on thumbnail */}
-                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && (
+                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && Array.isArray(annotationCache.current[img]) && (
                                         <div style={{
                                             position: 'absolute',
                                             top: 0,
@@ -857,7 +1055,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             pointerEvents: 'none'
                                         }}>
                                             {annotationCache.current[img].slice(0, 3).map((ann, annIdx) => {
-                                                const cls = classes.find(c => c.id === ann.class_id);
+                                                const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
                                                 if (!cls) return null;
                                                 // Scale annotation to thumbnail size (assuming image is loaded)
                                                 return (
@@ -895,7 +1093,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             <><Circle size={10} style={{ color: '#666' }} /> Empty</>
                                         )}
                                         {/* Tags */}
-                                        {imageTags && imageTags[img] && imageTags[img].length > 0 && (
+                                        {imageTags && imageTags[img] && Array.isArray(imageTags[img]) && imageTags[img].length > 0 && (
                                             <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', marginLeft: '4px' }}>
                                                 {imageTags[img].slice(0, 2).map((tag, idx) => (
                                                     <span key={idx} style={{
@@ -971,9 +1169,9 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 >
                                     <Trash2 size={12} />
                                 </button>
-                                </div>
                             </div>
-                        );
+                                </div>
+                            );
                         })}
                         {filteredImages.length === 0 && (
                             <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
@@ -985,24 +1183,29 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                 </div>
             </div>
 
-            {/* Export Button */}
-            <div style={{ padding: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('coco')}>
+                {/* Export Button */}
+                <div style={{ padding: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('preview')}>
+                    EXPORT (Preview)
+                </button>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('coco')}>
                     EXPORT COCO
                 </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('voc')}>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('voc')}>
                     EXPORT VOC
                 </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('report')}>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('report')}>
                     EXPORT REPORT
                 </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport('project')}>
+                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('project')}>
                     EXPORT PROJECT
                 </button>
                 <button className="btn-primary" style={{ width: '100%' }} onClick={() => onExport('import_project')}>
                     IMPORT PROJECT
                 </button>
-            </div>
+                </div>
+                </>
+            )}
             
             {/* Tag Editor Modal */}
             {showTagEditor && tagEditorImage && (

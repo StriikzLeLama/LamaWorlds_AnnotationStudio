@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings, Ruler, ChevronDown, ChevronUp } from 'lucide-react';
 
-function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence, recentClasses = [] }) {
+function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence, recentClasses = [], quickDrawMode = false, onToggleQuickDraw, showMeasurements = false, onToggleMeasurements, annotationTemplates = [], onSaveTemplate, onLoadTemplate, onDeleteTemplate, onOpenVisionLLM }) {
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
     const [showBatchMenu, setShowBatchMenu] = useState(false);
     const [showYoloPanel, setShowYoloPanel] = useState(false);
     const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const onClassClick = (clsId) => {
         if (selectedAnnotationId) {
@@ -168,10 +169,57 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
     };
 
     return (
-        <div className="glass-panel" style={{ width: '250px', margin: '10px', padding: '15px', display: 'flex', flexDirection: 'column' }}>
-            <h3 className="neon-text" style={{ marginTop: 0 }}>Classes</h3>
+        <div className="glass-panel" style={{ 
+            width: '250px', 
+            margin: '10px', 
+            padding: isCollapsed ? '8px 15px' : '15px', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'all 0.3s ease'
+        }}>
+            <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: isCollapsed ? 0 : '10px',
+                cursor: 'pointer',
+                userSelect: 'none'
+            }}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+                <h3 className="neon-text" style={{ margin: 0 }}>Classes</h3>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCollapsed(!isCollapsed);
+                    }}
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#00e0ff',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.background = 'transparent';
+                    }}
+                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+                >
+                    {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                </button>
+            </div>
 
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            {!isCollapsed && (
+                <>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
                 {classes.map(cls => (
                     <div
                         key={cls.id}
@@ -208,9 +256,9 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                         </div>
                     </div>
                 ))}
-            </div>
+                </div>
 
-            <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
                 <input
                     placeholder="New Class"
                     value={newClassName}
@@ -256,6 +304,70 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     >
                         <Brain size={14} />
                         YOLO Pre-annotation
+                    </button>
+                </div>
+                
+                {/* Quick Draw Mode */}
+                {onToggleQuickDraw && (
+                    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                        <button
+                            className="btn-primary"
+                            style={{ 
+                                width: '100%', 
+                                marginBottom: '8px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                gap: '6px', 
+                                fontSize: '0.8rem', 
+                                padding: '6px',
+                                background: quickDrawMode ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.1)',
+                                border: quickDrawMode ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(0, 224, 255, 0.3)'
+                            }}
+                            onClick={onToggleQuickDraw}
+                            title="Quick Draw Mode (Q) - Keep class selected for rapid annotation"
+                        >
+                            <Check size={14} style={{ opacity: quickDrawMode ? 1 : 0.5 }} />
+                            Quick Draw {quickDrawMode ? '(ON)' : '(OFF)'}
+                        </button>
+                    </div>
+                )}
+                
+                {/* Measurements Toggle */}
+                {onToggleMeasurements && (
+                    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                        <button
+                            className="btn-primary"
+                            style={{ 
+                                width: '100%', 
+                                marginBottom: '8px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                gap: '6px', 
+                                fontSize: '0.8rem', 
+                                padding: '6px',
+                                background: showMeasurements ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.1)',
+                                border: showMeasurements ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(0, 224, 255, 0.3)'
+                            }}
+                            onClick={onToggleMeasurements}
+                            title="Show Measurements (M) - Display annotation dimensions"
+                        >
+                            <Ruler size={14} style={{ opacity: showMeasurements ? 1 : 0.5 }} />
+                            Measurements {showMeasurements ? '(ON)' : '(OFF)'}
+                        </button>
+                    </div>
+                )}
+                
+                {/* Vision LLM Assistant */}
+                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+                    <button
+                        className="btn-primary"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
+                        onClick={onOpenVisionLLM}
+                    >
+                        <Brain size={14} />
+                        Vision LLM Assistant
                     </button>
                 </div>
                 
@@ -394,6 +506,8 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     )}
                 </div>
             </div>
+                </>
+            )}
             
             {/* YOLO Pre-annotation Panel */}
             {showYoloPanel && (

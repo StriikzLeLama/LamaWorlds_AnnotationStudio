@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
     selectFile: (filters) => ipcRenderer.invoke('select-file', filters),
     readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
+    showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
     onBackendError: (callback) => {
         ipcRenderer.on('backend-error', (event, error) => callback(error));
         // Return cleanup function

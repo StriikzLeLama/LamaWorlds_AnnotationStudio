@@ -6,4 +6,6 @@ opencv-python
 python-multipart
 watchdog
 pyyaml
+requests
+llama-cpp-python
 

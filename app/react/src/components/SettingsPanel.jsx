@@ -457,6 +457,38 @@ function DisplaySettings({ tempSettings, handleChange, getValue }) {
                 onChange={(v) => handleChange('showAnnotationIds', v)}
                 type="checkbox"
             />
+            
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <h4 style={{ color: '#00e0ff', fontSize: '0.95rem', marginBottom: '10px' }}>Image Transformations</h4>
+                
+                <SettingRow
+                    label="Reset Transform on Image Change"
+                    description="Reset rotation and flip when changing images"
+                    value={getValue('resetTransformOnImageChange')}
+                    onChange={(v) => {
+                        handleChange('resetTransformOnImageChange', v);
+                        // Disable lock if reset is enabled
+                        if (v) {
+                            handleChange('lockTransformAcrossImages', false);
+                        }
+                    }}
+                    type="checkbox"
+                />
+                
+                <SettingRow
+                    label="Lock Transform Across Images"
+                    description="Apply same rotation/flip to all images"
+                    value={getValue('lockTransformAcrossImages')}
+                    onChange={(v) => {
+                        handleChange('lockTransformAcrossImages', v);
+                        // Disable reset if lock is enabled
+                        if (v) {
+                            handleChange('resetTransformOnImageChange', false);
+                        }
+                    }}
+                    type="checkbox"
+                />
+            </div>
         </div>
     );
 }

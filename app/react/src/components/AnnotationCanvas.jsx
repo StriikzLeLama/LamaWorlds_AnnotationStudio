@@ -41,7 +41,7 @@ const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false,
     );
 });
 
-const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple, showAnnotations = true, onZoomToSelection, isFullscreen = false, onToggleFullscreen }) => {
+const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple, showAnnotations = true, onZoomToSelection, isFullscreen = false, onToggleFullscreen, quickDrawMode = false, showMeasurements = false, imageDimensions: propImageDimensions }) => {
     // Settings
     const { settings, getSetting } = useSettings();
     const snapToGrid = getSetting('snapToGrid', false);
@@ -54,6 +54,8 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     const annotationOpacity = getSetting('annotationOpacity', 0.7);
     const showAnnotationLabels = getSetting('showAnnotationLabels', true);
     const showAnnotationIds = getSetting('showAnnotationIds', false);
+    const resetTransformOnImageChange = getSetting('resetTransformOnImageChange', true);
+    const lockTransformAcrossImages = getSetting('lockTransformAcrossImages', false);
     
     const [stageScale, setStageScale] = useState(1);
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -67,6 +69,10 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     const [isSelecting, setIsSelecting] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+
+    // Use refs to store locked transforms if lockTransformAcrossImages is enabled
+    const lockedRotationRef = useRef(0);
+    const lockedFlipRef = useRef({ horizontal: false, vertical: false });
 
     const stageRef = useRef(null);
     const trRef = useRef(null);
@@ -158,16 +164,37 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     }, [resetZoom]);
 
     const rotateImage = useCallback((direction) => {
-        setImageRotation(prev => (prev + (direction === 'cw' ? 90 : -90)) % 360);
-    }, []);
+        setImageRotation(prev => {
+            const newRotation = (prev + (direction === 'cw' ? 90 : -90)) % 360;
+            // Update locked rotation if lock is enabled
+            if (lockTransformAcrossImages) {
+                lockedRotationRef.current = newRotation;
+            }
+            return newRotation;
+        });
+    }, [lockTransformAcrossImages]);
 
     const flipImage = useCallback((axis) => {
         if (axis === 'horizontal') {
-            setImageFlip(prev => ({ ...prev, horizontal: !prev.horizontal }));
+            setImageFlip(prev => {
+                const newFlip = { ...prev, horizontal: !prev.horizontal };
+                // Update locked flip if lock is enabled
+                if (lockTransformAcrossImages) {
+                    lockedFlipRef.current = { ...newFlip };
+                }
+                return newFlip;
+            });
         } else {
-            setImageFlip(prev => ({ ...prev, vertical: !prev.vertical }));
+            setImageFlip(prev => {
+                const newFlip = { ...prev, vertical: !prev.vertical };
+                // Update locked flip if lock is enabled
+                if (lockTransformAcrossImages) {
+                    lockedFlipRef.current = { ...newFlip };
+                }
+                return newFlip;
+            });
         }
-    }, []);
+    }, [lockTransformAcrossImages]);
 
     // Keyboard shortcuts for zoom, rotation, and pixel movement
     useEffect(() => {
@@ -725,11 +752,25 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     // Reset view and center image when image changes
     useEffect(() => {
         setStageScale(1);
-        setImageRotation(0);
-        setImageFlip({ horizontal: false, vertical: false });
         setImageLoaded(false);
+        setImageDimensions({ width: 0, height: 0 }); // Reset dimensions
         setStagePos({ x: 0, y: 0 });
-    }, [imageUrl]);
+        
+        // Handle rotation and flip based on settings
+        if (lockTransformAcrossImages) {
+            // Apply locked transforms
+            setImageRotation(lockedRotationRef.current);
+            setImageFlip({ ...lockedFlipRef.current });
+        } else if (resetTransformOnImageChange) {
+            // Reset transforms
+            setImageRotation(0);
+            setImageFlip({ horizontal: false, vertical: false });
+            // Also reset locked refs
+            lockedRotationRef.current = 0;
+            lockedFlipRef.current = { horizontal: false, vertical: false };
+        }
+        // If neither option is enabled, keep current transforms (default behavior)
+    }, [imageUrl, resetTransformOnImageChange, lockTransformAcrossImages]);
 
     // Handle minimap navigation
     const handleMinimapNavigate = useCallback((newPos) => {
@@ -1081,6 +1122,58 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                             listening={false}
                                         />
                                     )}
+                                </>
+                            )}
+                            {/* Measurements overlay */}
+                            {showMeasurements && (ann.id === selectedId || (selectedIds && selectedIds.has(ann.id))) && (
+                                <>
+                                    {/* Width line */}
+                                    <Line
+                                        points={[ann.x, ann.y - 25, ann.x + ann.width, ann.y - 25]}
+                                        stroke="#00e0ff"
+                                        strokeWidth={1}
+                                        dash={[5, 5]}
+                                        listening={false}
+                                    />
+                                    <Text
+                                        x={ann.x + ann.width / 2}
+                                        y={ann.y - 40}
+                                        text={`W: ${Math.abs(ann.width).toFixed(1)}px`}
+                                        fontSize={11}
+                                        fill="#00e0ff"
+                                        align="center"
+                                        listening={false}
+                                        offsetX={30}
+                                    />
+                                    {/* Height line */}
+                                    <Line
+                                        points={[ann.x - 25, ann.y, ann.x - 25, ann.y + ann.height]}
+                                        stroke="#00e0ff"
+                                        strokeWidth={1}
+                                        dash={[5, 5]}
+                                        listening={false}
+                                    />
+                                    <Text
+                                        x={ann.x - 40}
+                                        y={ann.y + ann.height / 2}
+                                        text={`H: ${Math.abs(ann.height).toFixed(1)}px`}
+                                        fontSize={11}
+                                        fill="#00e0ff"
+                                        align="center"
+                                        listening={false}
+                                        offsetY={15}
+                                    />
+                                    {/* Area text */}
+                                    <Text
+                                        x={ann.x + ann.width / 2}
+                                        y={ann.y + ann.height + 15}
+                                        text={`Area: ${(Math.abs(ann.width) * Math.abs(ann.height)).toFixed(1)}px²`}
+                                        fontSize={10}
+                                        fill="#56b0ff"
+                                        align="center"
+                                        listening={false}
+                                        offsetX={35}
+                                    />
                                 </>
                             )}
                             </React.Fragment>

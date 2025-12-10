@@ -16,6 +16,9 @@ const DEFAULT_SETTINGS = {
     showRecentClasses: true,
     recentClassesCount: 5,
     quickAnnotationMode: false,
+    quickDrawMode: false, // Keep class selected for rapid annotation
+    annotationTemplates: [], // Saved annotation templates
+    enableAnnotationGroups: false, // Group annotations together
     
     // Validation
     validateMinSize: true,
@@ -33,6 +36,8 @@ const DEFAULT_SETTINGS = {
     annotationOpacity: 0.7,
     showAnnotationLabels: true,
     showAnnotationIds: false,
+    resetTransformOnImageChange: true, // Reset rotation/flip when changing image
+    lockTransformAcrossImages: false, // Lock rotation/flip across all images
     
     // Keyboard shortcuts (customizable)
     shortcuts: {

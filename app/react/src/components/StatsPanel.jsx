@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, CheckCircle, Circle, Image as ImageIcon, TrendingUp, Database } from 'lucide-react';
+import CollapsiblePanel from './CollapsiblePanel';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
@@ -69,19 +70,11 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
     const progress = totalImages > 0 ? ((currentAnnotatedCount / totalImages) * 100).toFixed(1) : 0;
     
     return (
-        <div className="glass-panel" style={{ 
-            width: '100%', 
-            padding: '15px', 
-            display: 'flex', 
-            flexDirection: 'column',
-            maxHeight: '400px',
-            overflowY: 'auto'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-                <BarChart3 size={18} style={{ color: '#00e0ff' }} />
-                <h3 className="neon-text" style={{ margin: 0, fontSize: '1rem' }}>Statistics</h3>
-            </div>
-            
+        <CollapsiblePanel 
+            title="Statistics" 
+            icon={BarChart3}
+            containerStyle={{ maxHeight: '400px', overflowY: 'auto' }}
+        >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Dataset Progress */}
                 <div style={{ padding: '10px', background: 'rgba(0, 224, 255, 0.05)', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.2)' }}>
@@ -189,7 +182,7 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                     </div>
                 )}
             </div>
-        </div>
+        </CollapsiblePanel>
     );
 }
 

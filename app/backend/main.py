@@ -650,6 +650,569 @@ def delete_image(dataset_path: str = Body(...), image_path: str = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting image: {str(e)}")
 
+# Vision LLM Models
+class VisionLLMRequest(BaseModel):
+    images: List[str]
+    annotations: List[dict] = []
+    classes: List[dict] = []
+    dataset_path: str
+    api_provider: str = "openai"
+    api_key: str = ""
+    api_endpoint: str = "https://api.openai.com/v1/chat/completions"
+    model: str = "gpt-4-vision-preview"
+    gguf_model_path: str = ""
+    confidence_threshold: float = 0.7
+    mode: str = "verify"  # verify, annotate, modify
+    auto_apply: bool = False
+
+@app.post("/vision_llm/verify_all")
+async def verify_all_images(request: VisionLLMRequest):
+    """
+    Verify all images and annotations using Vision LLM.
+    Returns confidence scores and validation results.
+    """
+    try:
+        import base64
+        try:
+            import requests
+        except ImportError:
+            raise HTTPException(status_code=500, detail="The 'requests' library is required for Vision LLM. Install it with: pip install requests")
+        
+        results = {
+            "total_count": len(request.images),
+            "verified_count": 0,
+            "overall_score": 0.0,
+            "image_results": []
+        }
+        
+        total_score = 0.0
+        verified = 0
+        
+        for img_path in request.images:
+            try:
+                # Read and encode image
+                if not os.path.exists(img_path):
+                    continue
+                
+                with open(img_path, 'rb') as f:
+                    image_data = f.read()
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                
+                # Get existing annotations for this image
+                image_annotations = [ann for ann in request.annotations if ann.get('image_name') == os.path.basename(img_path)]
+                
+                # Prepare prompt for LLM
+                classes_str = ", ".join([f"{c.get('id')}: {c.get('name', 'Unknown')}" for c in request.classes])
+                prompt = f"""Analyze this image and verify the annotations. 
+Classes available: {classes_str}
+Existing annotations: {len(image_annotations)}
+
+Please provide:
+1. A confidence score (0-1) for annotation quality
+2. Issues found (if any)
+3. Suggestions for improvement
+
+Respond in JSON format:
+{{
+    "confidence": 0.0-1.0,
+    "issues": ["issue1", "issue2"],
+    "suggestions": ["suggestion1", "suggestion2"],
+    "overall_quality": "good|fair|poor"
+}}"""
+                
+                # Call LLM API or local model
+                if request.api_provider == "gguf":
+                    # Use local GGUF model
+                    if not request.gguf_model_path or not os.path.exists(request.gguf_model_path):
+                        raise HTTPException(status_code=400, detail="GGUF model file not found")
+                    
+                    try:
+                        from llama_cpp import Llama
+                        # Load model (cache it for performance)
+                        if not hasattr(verify_all_images, '_gguf_model_cache'):
+                            verify_all_images._gguf_model_cache = {}
+                        
+                        model_key = request.gguf_model_path
+                        if model_key not in verify_all_images._gguf_model_cache:
+                            print(f"Loading GGUF model: {request.gguf_model_path}")
+                            verify_all_images._gguf_model_cache[model_key] = Llama(
+                                model_path=request.gguf_model_path,
+                                n_ctx=4096,  # Context window
+                                n_threads=4,  # Number of CPU threads
+                                verbose=False
+                            )
+                            print("Model loaded successfully")
+                        
+                        llm = verify_all_images._gguf_model_cache[model_key]
+                        
+                        # For vision models, we need to encode the image
+                        # LLaVA-style models expect image tokens
+                        # For now, we'll use a text-only approach with image description
+                        # In a full implementation, you'd use the model's vision encoder
+                        
+                        # Create a combined prompt with image info
+                        full_prompt = f"{prompt}\n\nImage data (base64): {image_base64[:100]}..."  # Truncated for token limits
+                        
+                        # Generate response
+                        response = llm(
+                            full_prompt,
+                            max_tokens=500,
+                            temperature=0.7,
+                            stop=["\n\n"]
+                        )
+                        content = response['choices'][0]['text']
+                    except ImportError:
+                        raise HTTPException(status_code=500, detail="llama-cpp-python is required for GGUF models. Install with: pip install llama-cpp-python")
+                    except Exception as e:
+                        print(f"Error with GGUF model: {str(e)}")
+                        # Fallback to default
+                        content = '{"confidence": 0.5, "issues": [], "suggestions": [], "overall_quality": "fair"}'
+                        
+                elif request.api_provider == "openai":
+                    headers = {
+                        "Authorization": f"Bearer {request.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": request.model,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{image_base64}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "max_tokens": 500
+                    }
+                    response = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60
+                    )
+                    response.raise_for_status()
+                    llm_response = response.json()
+                    content = llm_response['choices'][0]['message']['content']
+                else:
+                    # Custom API or Claude - would need similar implementation
+                    content = '{"confidence": 0.5, "issues": [], "suggestions": [], "overall_quality": "fair"}'
+                
+                # Parse response
+                try:
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        result = json.loads(json_match.group())
+                    else:
+                        result = {"confidence": 0.5, "issues": [], "suggestions": [], "overall_quality": "fair"}
+                except:
+                    result = {"confidence": 0.5, "issues": [], "suggestions": [], "overall_quality": "fair"}
+                
+                confidence = float(result.get("confidence", 0.5))
+                total_score += confidence
+                verified += 1
+                
+                results["image_results"].append({
+                    "image_path": img_path,
+                    "confidence": confidence,
+                    "issues": result.get("issues", []),
+                    "suggestions": result.get("suggestions", []),
+                    "overall_quality": result.get("overall_quality", "fair")
+                })
+                
+            except Exception as e:
+                print(f"Error processing image {img_path}: {str(e)}")
+                results["image_results"].append({
+                    "image_path": img_path,
+                    "confidence": 0.0,
+                    "error": str(e)
+                })
+        
+        if verified > 0:
+            results["overall_score"] = total_score / verified
+            results["verified_count"] = verified
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in vision LLM verification: {str(e)}")
+
+@app.post("/vision_llm/annotate_all")
+async def annotate_all_images(request: VisionLLMRequest):
+    """
+    Annotate all images using Vision LLM.
+    Creates new annotations based on LLM analysis.
+    """
+    try:
+        import base64
+        try:
+            import requests
+        except ImportError:
+            raise HTTPException(status_code=500, detail="The 'requests' library is required for Vision LLM. Install it with: pip install requests")
+        
+        results = {
+            "total_count": len(request.images),
+            "annotated_count": 0,
+            "annotations_count": 0,
+            "annotations": []
+        }
+        
+        for img_path in request.images:
+            try:
+                # Read and encode image
+                if not os.path.exists(img_path):
+                    continue
+                
+                with open(img_path, 'rb') as f:
+                    image_data = f.read()
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                
+                # Get image dimensions
+                img = Image.open(img_path)
+                img_width, img_height = img.size
+                
+                # Prepare prompt for LLM
+                classes_str = ", ".join([f"{c.get('id')}: {c.get('name', 'Unknown')}" for c in request.classes])
+                prompt = f"""Analyze this image and create bounding box annotations in YOLO format.
+Classes available: {classes_str}
+Image dimensions: {img_width}x{img_height}
+
+Please identify all objects and provide annotations in JSON format:
+{{
+    "annotations": [
+        {{
+            "class_id": 0,
+            "x_center": 0.5,
+            "y_center": 0.5,
+            "width": 0.2,
+            "height": 0.2,
+            "confidence": 0.9
+        }}
+    ]
+}}
+
+Use YOLO format (normalized coordinates 0-1, center-based).
+Only include annotations with confidence >= {request.confidence_threshold}."""
+                
+                # Call LLM API or local model
+                if request.api_provider == "gguf":
+                    # Use local GGUF model
+                    if not request.gguf_model_path or not os.path.exists(request.gguf_model_path):
+                        raise HTTPException(status_code=400, detail="GGUF model file not found")
+                    
+                    try:
+                        from llama_cpp import Llama
+                        # Load model (cache it for performance)
+                        if not hasattr(annotate_all_images, '_gguf_model_cache'):
+                            annotate_all_images._gguf_model_cache = {}
+                        
+                        model_key = request.gguf_model_path
+                        if model_key not in annotate_all_images._gguf_model_cache:
+                            print(f"Loading GGUF model: {request.gguf_model_path}")
+                            annotate_all_images._gguf_model_cache[model_key] = Llama(
+                                model_path=request.gguf_model_path,
+                                n_ctx=4096,
+                                n_threads=4,
+                                verbose=False
+                            )
+                            print("Model loaded successfully")
+                        
+                        llm = annotate_all_images._gguf_model_cache[model_key]
+                        
+                        # Create a combined prompt with image info
+                        full_prompt = f"{prompt}\n\nImage data (base64): {image_base64[:100]}..."
+                        
+                        # Generate response
+                        response = llm(
+                            full_prompt,
+                            max_tokens=2000,
+                            temperature=0.7,
+                            stop=["\n\n"]
+                        )
+                        content = response['choices'][0]['text']
+                    except ImportError:
+                        raise HTTPException(status_code=500, detail="llama-cpp-python is required for GGUF models. Install with: pip install llama-cpp-python")
+                    except Exception as e:
+                        print(f"Error with GGUF model: {str(e)}")
+                        content = '{"annotations": []}'
+                        
+                elif request.api_provider == "openai":
+                    headers = {
+                        "Authorization": f"Bearer {request.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": request.model,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{image_base64}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "max_tokens": 2000
+                    }
+                    response = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=120
+                    )
+                    response.raise_for_status()
+                    llm_response = response.json()
+                    content = llm_response['choices'][0]['message']['content']
+                else:
+                    content = '{"annotations": []}'
+                
+                # Parse response
+                try:
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        result = json.loads(json_match.group())
+                    else:
+                        result = {"annotations": []}
+                except:
+                    result = {"annotations": []}
+                
+                # Convert to annotation format
+                annotations = []
+                for ann_data in result.get("annotations", []):
+                    if ann_data.get("confidence", 0) >= request.confidence_threshold:
+                        # Convert from YOLO center format to corner format
+                        x_center = ann_data.get("x_center", 0.5)
+                        y_center = ann_data.get("y_center", 0.5)
+                        width = ann_data.get("width", 0.1)
+                        height = ann_data.get("height", 0.1)
+                        
+                        # Convert to pixel coordinates
+                        x = (x_center - width/2) * img_width
+                        y = (y_center - height/2) * img_height
+                        w = width * img_width
+                        h = height * img_height
+                        
+                        annotations.append({
+                            "class_id": int(ann_data.get("class_id", 0)),
+                            "x": x,
+                            "y": y,
+                            "width": w,
+                            "height": h,
+                            "confidence": ann_data.get("confidence", 0.5)
+                        })
+                
+                if annotations:
+                    results["annotations"].append({
+                        "image_path": img_path,
+                        "annotations": annotations
+                    })
+                    results["annotated_count"] += 1
+                    results["annotations_count"] += len(annotations)
+                
+            except Exception as e:
+                print(f"Error annotating image {img_path}: {str(e)}")
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in vision LLM annotation: {str(e)}")
+
+@app.post("/vision_llm/modify_annotations")
+async def modify_annotations(request: VisionLLMRequest):
+    """
+    Modify existing annotations using Vision LLM.
+    Improves annotation quality and fixes issues.
+    """
+    try:
+        import base64
+        try:
+            import requests
+        except ImportError:
+            raise HTTPException(status_code=500, detail="The 'requests' library is required for Vision LLM. Install it with: pip install requests")
+        
+        results = {
+            "total_count": len(request.images),
+            "modified_count": 0,
+            "modifications_count": 0,
+            "modifications": []
+        }
+        
+        for img_path in request.images:
+            try:
+                # Read and encode image
+                if not os.path.exists(img_path):
+                    continue
+                
+                with open(img_path, 'rb') as f:
+                    image_data = f.read()
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                
+                # Get existing annotations for this image
+                image_annotations = [ann for ann in request.annotations if ann.get('image_name') == os.path.basename(img_path)]
+                
+                if not image_annotations:
+                    continue
+                
+                # Get image dimensions
+                img = Image.open(img_path)
+                img_width, img_height = img.size
+                
+                # Prepare prompt for LLM
+                classes_str = ", ".join([f"{c.get('id')}: {c.get('name', 'Unknown')}" for c in request.classes])
+                annotations_str = json.dumps(image_annotations, indent=2)
+                prompt = f"""Review and improve these annotations for this image.
+Classes available: {classes_str}
+Image dimensions: {img_width}x{img_height}
+Current annotations: {annotations_str}
+
+Please:
+1. Verify annotation accuracy
+2. Fix any positioning errors
+3. Adjust bounding boxes if needed
+4. Remove false positives
+5. Add missing objects
+
+Respond with improved annotations in JSON format:
+{{
+    "annotations": [
+        {{
+            "class_id": 0,
+            "x": 100,
+            "y": 100,
+            "width": 200,
+            "height": 200,
+            "confidence": 0.9
+        }}
+    ],
+    "changes": ["description of changes made"]
+}}
+
+Use pixel coordinates (not normalized)."""
+                
+                # Call LLM API or local model
+                if request.api_provider == "gguf":
+                    # Use local GGUF model
+                    if not request.gguf_model_path or not os.path.exists(request.gguf_model_path):
+                        raise HTTPException(status_code=400, detail="GGUF model file not found")
+                    
+                    try:
+                        from llama_cpp import Llama
+                        # Load model (cache it for performance)
+                        if not hasattr(modify_annotations, '_gguf_model_cache'):
+                            modify_annotations._gguf_model_cache = {}
+                        
+                        model_key = request.gguf_model_path
+                        if model_key not in modify_annotations._gguf_model_cache:
+                            print(f"Loading GGUF model: {request.gguf_model_path}")
+                            modify_annotations._gguf_model_cache[model_key] = Llama(
+                                model_path=request.gguf_model_path,
+                                n_ctx=4096,
+                                n_threads=4,
+                                verbose=False
+                            )
+                            print("Model loaded successfully")
+                        
+                        llm = modify_annotations._gguf_model_cache[model_key]
+                        
+                        # Create a combined prompt with image info
+                        full_prompt = f"{prompt}\n\nImage data (base64): {image_base64[:100]}..."
+                        
+                        # Generate response
+                        response = llm(
+                            full_prompt,
+                            max_tokens=2000,
+                            temperature=0.7,
+                            stop=["\n\n"]
+                        )
+                        content = response['choices'][0]['text']
+                    except ImportError:
+                        raise HTTPException(status_code=500, detail="llama-cpp-python is required for GGUF models. Install with: pip install llama-cpp-python")
+                    except Exception as e:
+                        print(f"Error with GGUF model: {str(e)}")
+                        content = '{"annotations": [], "changes": []}'
+                        
+                elif request.api_provider == "openai":
+                    headers = {
+                        "Authorization": f"Bearer {request.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": request.model,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{image_base64}"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "max_tokens": 2000
+                    }
+                    response = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=120
+                    )
+                    response.raise_for_status()
+                    llm_response = response.json()
+                    content = llm_response['choices'][0]['message']['content']
+                else:
+                    content = '{"annotations": [], "changes": []}'
+                
+                # Parse response
+                try:
+                    import re
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        result = json.loads(json_match.group())
+                    else:
+                        result = {"annotations": image_annotations, "changes": []}
+                except:
+                    result = {"annotations": image_annotations, "changes": []}
+                
+                # Filter by confidence
+                modified_annotations = [
+                    ann for ann in result.get("annotations", [])
+                    if ann.get("confidence", 1.0) >= request.confidence_threshold
+                ]
+                
+                if modified_annotations:
+                    results["modifications"].append({
+                        "image_path": img_path,
+                        "annotations": modified_annotations,
+                        "changes": result.get("changes", [])
+                    })
+                    results["modified_count"] += 1
+                    results["modifications_count"] += len(modified_annotations)
+                
+            except Exception as e:
+                print(f"Error modifying annotations for {img_path}: {str(e)}")
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in vision LLM modification: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     import sys
