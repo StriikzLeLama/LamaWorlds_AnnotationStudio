@@ -1,14 +1,86 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings, Ruler, ChevronDown, ChevronUp } from 'lucide-react';
+/**
+ * @fileoverview Sidebar Component - Class Management and Tools
+ * 
+ * This component provides the left sidebar with:
+ * - Class list with color management
+ * - YAML import/export
+ * - YOLO pre-annotation tools
+ * - Vision LLM integration
+ * - Quick draw and measurements toggles
+ * - Annotation templates
+ * - Compact dropdown menus for better organization
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Array<Object>} props.classes - Array of annotation classes
+ * @param {Function} props.setClasses - Function to update classes
+ * @param {number} props.selectedClassId - Currently selected class ID
+ * @param {Function} props.setSelectedClassId - Function to set selected class
+ * @param {string|null} props.selectedAnnotationId - Currently selected annotation ID
+ * @param {Function} props.onChangeAnnotationClass - Function to change annotation class
+ * @param {Function} props.onImportYaml - Function to import YAML classes
+ * @param {Array<Object>} props.annotations - Current image annotations
+ * @param {Function} props.onBatchDeleteClass - Function to batch delete by class
+ * @param {Function} props.onBatchChangeClass - Function to batch change class
+ * @param {Function} props.onAlignAnnotations - Function to align annotations
+ * @param {Function} props.onPreAnnotate - Function to pre-annotate with YOLO
+ * @param {string} props.yoloModelPath - Path to YOLO model
+ * @param {Function} props.setYoloModelPath - Function to set YOLO model path
+ * @param {number} props.yoloConfidence - YOLO confidence threshold
+ * @param {Function} props.setYoloConfidence - Function to set confidence threshold
+ * @param {Array<number>} props.recentClasses - Recently used class IDs
+ * @param {boolean} props.quickDrawMode - Quick draw mode enabled
+ * @param {Function} props.onToggleQuickDraw - Function to toggle quick draw
+ * @param {boolean} props.showMeasurements - Show measurements enabled
+ * @param {Function} props.onToggleMeasurements - Function to toggle measurements
+ * @param {Array<Object>} props.annotationTemplates - Saved annotation templates
+ * @param {Function} props.onSaveTemplate - Function to save template
+ * @param {Function} props.onLoadTemplate - Function to load template
+ * @param {Function} props.onDeleteTemplate - Function to delete template
+ * @param {Function} props.onOpenVisionLLM - Function to open Vision LLM modal
+ * @returns {JSX.Element} The rendered sidebar component
+ */
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings, Ruler, ChevronDown, ChevronUp, FileText, Zap, History, Search } from 'lucide-react';
 
 function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence, recentClasses = [], quickDrawMode = false, onToggleQuickDraw, showMeasurements = false, onToggleMeasurements, annotationTemplates = [], onSaveTemplate, onLoadTemplate, onDeleteTemplate, onOpenVisionLLM }) {
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
+    const [classSearchQuery, setClassSearchQuery] = useState('');
     const [showBatchMenu, setShowBatchMenu] = useState(false);
     const [showYoloPanel, setShowYoloPanel] = useState(false);
     const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
+    const [showToolsMenu, setShowToolsMenu] = useState(false);
+    const [showTogglesMenu, setShowTogglesMenu] = useState(false);
+    const templatesMenuRef = useRef(null);
+    const toolsMenuRef = useRef(null);
+    const togglesMenuRef = useRef(null);
+    
+    // Close menus when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (templatesMenuRef.current && !templatesMenuRef.current.contains(event.target)) {
+                setShowTemplatesMenu(false);
+            }
+            if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target)) {
+                setShowToolsMenu(false);
+            }
+            if (togglesMenuRef.current && !togglesMenuRef.current.contains(event.target)) {
+                setShowTogglesMenu(false);
+            }
+        };
+        
+        if (showTemplatesMenu || showToolsMenu || showTogglesMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showTemplatesMenu, showToolsMenu, showTogglesMenu]);
 
     const onClassClick = (clsId) => {
         if (selectedAnnotationId) {
@@ -170,24 +242,25 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
     return (
         <div className="glass-panel" style={{ 
-            width: '250px', 
+            width: isCollapsed ? '60px' : '250px', 
             margin: '10px', 
             padding: isCollapsed ? '8px 15px' : '15px', 
             display: 'flex', 
             flexDirection: 'column',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            overflow: isCollapsed ? 'hidden' : 'visible'
         }}>
             <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                justifyContent: 'space-between',
+                justifyContent: isCollapsed ? 'center' : 'space-between',
                 marginBottom: isCollapsed ? 0 : '10px',
                 cursor: 'pointer',
                 userSelect: 'none'
             }}
             onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                <h3 className="neon-text" style={{ margin: 0 }}>Classes</h3>
+                {!isCollapsed && <h3 className="neon-text" style={{ margin: 0 }}>Classes</h3>}
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
@@ -219,8 +292,33 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
             {!isCollapsed && (
                 <>
+                {/* Search bar for classes */}
+                <div style={{ position: 'relative', marginBottom: '10px' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', zIndex: 1 }} />
+                    <input
+                        type="text"
+                        placeholder="Search classes..."
+                        value={classSearchQuery}
+                        onChange={(e) => setClassSearchQuery(e.target.value)}
+                        style={{ 
+                            width: '100%', 
+                            padding: '6px 8px 6px 30px', 
+                            background: 'rgba(255,255,255,0.1)', 
+                            border: '1px solid rgba(255,255,255,0.2)', 
+                            borderRadius: '4px', 
+                            color: 'white',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box'
+                        }}
+                    />
+                </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                {classes.map(cls => (
+                {classes
+                    .filter(cls => {
+                        if (!classSearchQuery) return true;
+                        return cls.name.toLowerCase().includes(classSearchQuery.toLowerCase());
+                    })
+                    .map(cls => (
                     <div
                         key={cls.id}
                         onClick={() => onClassClick(cls.id)}
@@ -268,120 +366,289 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                 />
                 <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={addClass}>Add Class</button>
                 
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                {/* Templates Menu - Compact */}
+                <div ref={templatesMenuRef} style={{ position: 'relative', marginBottom: '8px' }}>
                     <button 
                         className="btn-primary" 
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }} 
-                        onClick={onImportYaml}
+                        style={{ 
+                            width: '100%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            fontSize: '0.8rem'
+                        }} 
+                        onClick={() => setShowTemplatesMenu(!showTemplatesMenu)}
                     >
-                        <Upload size={14} />
-                        YAML
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <FileText size={14} />
+                            <span>Templates</span>
+                        </div>
+                        <ChevronDown size={14} style={{ transform: showTemplatesMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                     </button>
-                    <button 
-                        className="btn-primary" 
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }} 
-                        onClick={loadTemplate}
-                    >
-                        <FolderOpen size={14} />
-                        Load
-                    </button>
-                    <button 
-                        className="btn-primary" 
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }} 
-                        onClick={saveTemplate}
-                    >
-                        <Save size={14} />
-                        Save
-                    </button>
+                    
+                    {showTemplatesMenu && (
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            left: 0,
+                            right: 0,
+                            marginBottom: '4px',
+                            background: 'rgba(20, 20, 35, 0.95)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            borderRadius: '8px',
+                            padding: '6px',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            minWidth: '150px'
+                        }}>
+                            <button 
+                                className="btn-secondary"
+                                style={{ 
+                                    padding: '6px 8px', 
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    justifyContent: 'flex-start'
+                                }} 
+                                onClick={() => { onImportYaml(); setShowTemplatesMenu(false); }}
+                                title="Import classes from YAML file"
+                            >
+                                <Upload size={14} />
+                                Import YAML
+                            </button>
+                            <button 
+                                className="btn-secondary"
+                                style={{ 
+                                    padding: '6px 8px', 
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    justifyContent: 'flex-start'
+                                }} 
+                                onClick={() => { loadTemplate(); setShowTemplatesMenu(false); }}
+                                title="Load class template"
+                            >
+                                <FolderOpen size={14} />
+                                Load Template
+                            </button>
+                            <button 
+                                className="btn-secondary"
+                                style={{ 
+                                    padding: '6px 8px', 
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    justifyContent: 'flex-start'
+                                }} 
+                                onClick={() => { saveTemplate(); setShowTemplatesMenu(false); }}
+                                title="Save class template"
+                            >
+                                <Save size={14} />
+                                Save Template
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
-                {/* YOLO Pre-annotation */}
-                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
-                    <button
-                        className="btn-primary"
-                        style={{ width: '100%', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
-                        onClick={() => setShowYoloPanel(true)}
+                {/* Tools Menu - Compact */}
+                <div ref={toolsMenuRef} style={{ position: 'relative', marginBottom: '8px' }}>
+                    <button 
+                        className="btn-primary" 
+                        style={{ 
+                            width: '100%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            fontSize: '0.8rem'
+                        }} 
+                        onClick={() => setShowToolsMenu(!showToolsMenu)}
                     >
-                        <Brain size={14} />
-                        YOLO Pre-annotation
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Zap size={14} />
+                            <span>Tools</span>
+                        </div>
+                        <ChevronDown size={14} style={{ transform: showToolsMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                     </button>
+                    
+                    {showToolsMenu && (
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            left: 0,
+                            right: 0,
+                            marginBottom: '4px',
+                            background: 'rgba(20, 20, 35, 0.95)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            borderRadius: '8px',
+                            padding: '6px',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            minWidth: '150px'
+                        }}>
+                            <button 
+                                className="btn-secondary"
+                                style={{ 
+                                    padding: '6px 8px', 
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    justifyContent: 'flex-start'
+                                }} 
+                                onClick={() => { setShowYoloPanel(true); setShowToolsMenu(false); }}
+                                title="YOLO Pre-annotation"
+                            >
+                                <Brain size={14} />
+                                YOLO Pre-annotation
+                            </button>
+                            {onOpenVisionLLM && (
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        justifyContent: 'flex-start'
+                                    }} 
+                                    onClick={() => { onOpenVisionLLM(); setShowToolsMenu(false); }}
+                                    title="Vision LLM Assistant"
+                                >
+                                    <Brain size={14} />
+                                    Vision LLM
+                                </button>
+                            )}
+                            <button 
+                                className="btn-secondary"
+                                style={{ 
+                                    padding: '6px 8px', 
+                                    fontSize: '0.75rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    justifyContent: 'flex-start'
+                                }} 
+                                onClick={() => { setShowShortcutsPanel(true); setShowToolsMenu(false); }}
+                                title="Custom Shortcuts"
+                            >
+                                <Settings size={14} />
+                                Shortcuts
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
-                {/* Quick Draw Mode */}
-                {onToggleQuickDraw && (
-                    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
-                        <button
-                            className="btn-primary"
+                {/* Toggles Menu - Compact */}
+                {(onToggleQuickDraw || onToggleMeasurements) && (
+                    <div ref={togglesMenuRef} style={{ position: 'relative', marginBottom: '8px' }}>
+                        <button 
+                            className="btn-primary" 
                             style={{ 
                                 width: '100%', 
-                                marginBottom: '8px', 
                                 display: 'flex', 
                                 alignItems: 'center', 
-                                justifyContent: 'center', 
-                                gap: '6px', 
-                                fontSize: '0.8rem', 
-                                padding: '6px',
-                                background: quickDrawMode ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.1)',
-                                border: quickDrawMode ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(0, 224, 255, 0.3)'
-                            }}
-                            onClick={onToggleQuickDraw}
-                            title="Quick Draw Mode (Q) - Keep class selected for rapid annotation"
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                fontSize: '0.8rem'
+                            }} 
+                            onClick={() => setShowTogglesMenu(!showTogglesMenu)}
                         >
-                            <Check size={14} style={{ opacity: quickDrawMode ? 1 : 0.5 }} />
-                            Quick Draw {quickDrawMode ? '(ON)' : '(OFF)'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Settings size={14} />
+                                <span>Options</span>
+                            </div>
+                            <ChevronDown size={14} style={{ transform: showTogglesMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                         </button>
+                        
+                        {showTogglesMenu && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '100%',
+                                left: 0,
+                                right: 0,
+                                marginBottom: '4px',
+                                background: 'rgba(20, 20, 35, 0.95)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                borderRadius: '8px',
+                                padding: '6px',
+                                zIndex: 1000,
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                minWidth: '150px'
+                            }}>
+                                {onToggleQuickDraw && (
+                                    <button 
+                                        className="btn-secondary"
+                                        style={{ 
+                                            padding: '6px 8px', 
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            justifyContent: 'space-between',
+                                            background: quickDrawMode ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                            border: quickDrawMode ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
+                                        }} 
+                                        onClick={() => { onToggleQuickDraw(); setShowTogglesMenu(false); }}
+                                        title="Quick Draw Mode (Q)"
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Check size={14} style={{ opacity: quickDrawMode ? 1 : 0.5 }} />
+                                            <span>Quick Draw</span>
+                                        </div>
+                                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{quickDrawMode ? 'ON' : 'OFF'}</span>
+                                    </button>
+                                )}
+                                {onToggleMeasurements && (
+                                    <button 
+                                        className="btn-secondary"
+                                        style={{ 
+                                            padding: '6px 8px', 
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            justifyContent: 'space-between',
+                                            background: showMeasurements ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                            border: showMeasurements ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
+                                        }} 
+                                        onClick={() => { onToggleMeasurements(); setShowTogglesMenu(false); }}
+                                        title="Show Measurements (M)"
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Ruler size={14} style={{ opacity: showMeasurements ? 1 : 0.5 }} />
+                                            <span>Measurements</span>
+                                        </div>
+                                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>{showMeasurements ? 'ON' : 'OFF'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
-                
-                {/* Measurements Toggle */}
-                {onToggleMeasurements && (
-                    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
-                        <button
-                            className="btn-primary"
-                            style={{ 
-                                width: '100%', 
-                                marginBottom: '8px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                gap: '6px', 
-                                fontSize: '0.8rem', 
-                                padding: '6px',
-                                background: showMeasurements ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.1)',
-                                border: showMeasurements ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(0, 224, 255, 0.3)'
-                            }}
-                            onClick={onToggleMeasurements}
-                            title="Show Measurements (M) - Display annotation dimensions"
-                        >
-                            <Ruler size={14} style={{ opacity: showMeasurements ? 1 : 0.5 }} />
-                            Measurements {showMeasurements ? '(ON)' : '(OFF)'}
-                        </button>
-                    </div>
-                )}
-                
-                {/* Vision LLM Assistant */}
-                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
-                    <button
-                        className="btn-primary"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
-                        onClick={onOpenVisionLLM}
-                    >
-                        <Brain size={14} />
-                        Vision LLM Assistant
-                    </button>
-                </div>
-                
-                {/* Custom Shortcuts */}
-                <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
-                    <button
-                        className="btn-primary"
-                        style={{ width: '100%', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px' }}
-                        onClick={() => setShowShortcutsPanel(true)}
-                    >
-                        <Settings size={14} />
-                        Custom Shortcuts
-                    </button>
-                </div>
                 
                 {/* Batch Operations */}
                 <div style={{ position: 'relative' }}>
@@ -409,7 +676,9 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                             zIndex: 1000,
                             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
                             maxHeight: '400px',
-                            overflowY: 'auto'
+                            overflowY: 'auto',
+                            minWidth: '200px',
+                            maxWidth: '100%'
                         }}>
                             {/* Delete Operations */}
                             <div style={{ fontSize: '0.85rem', color: '#aaa', marginBottom: '8px', fontWeight: 'bold' }}>Delete:</div>

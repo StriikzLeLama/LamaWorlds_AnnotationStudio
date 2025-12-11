@@ -26,3 +26,16 @@ class ClassItem(BaseModel):
 class ClassUpdate(BaseModel):
     classes: List[ClassItem]
     dataset_path: str
+
+class MergeDatasetsRequest(BaseModel):
+    dataset_paths: List[str]
+    output_path: str
+    merge_classes: bool = True
+    rename_conflicting_images: bool = True
+
+class ExportProjectRequest(BaseModel):
+    dataset_path: str
+    output_path: str
+
+class ImportProjectRequest(BaseModel):
+    project_path: str

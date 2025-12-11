@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
+    selectFolder: () => ipcRenderer.invoke('select-directory'), // Alias for selectDirectory
     selectFile: (filters) => ipcRenderer.invoke('select-file', filters),
     readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
     showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),

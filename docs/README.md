@@ -2,7 +2,7 @@
 
 A modern and powerful image annotation tool for YOLO datasets, with an elegant user interface and advanced features.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
@@ -10,13 +10,18 @@ A modern and powerful image annotation tool for YOLO datasets, with an elegant u
 
 ### 🎨 Modern Interface
 - **Dark interface** with futuristic neon design
+- **Multiple themes**: Dark, Light, and Cyberpunk (customizable)
 - **Interactive canvas** with zoom, pan, rotation, and flip
 - **Image thumbnails** with annotation preview
 - **Grid and list views** for quick navigation
-- **Fullscreen mode** for maximum focus
+- **Fullscreen mode** for maximum focus (F11)
 - **Progress bar** to track your work
-- **Real-time statistics panel**
-- **Integrated validation panel**
+- **Real-time statistics panel** (collapsible)
+- **Integrated validation panel** (collapsible)
+- **Analytics panel** with advanced visualizations (collapsible)
+- **Layout manager** with customizable presets (Annotation Focus, Stats Focus, Balanced, Minimal)
+- **Mini-map** for quick dataset navigation
+- **Image preview tooltip** on hover
 
 ### 📝 Advanced Annotation
 - **Rectangular annotations** (YOLO format)
@@ -32,22 +37,34 @@ A modern and powerful image annotation tool for YOLO datasets, with an elegant u
 ### 🔍 Navigation & Search
 - **Image search** in real-time
 - **Search in annotations** (classes, comments, tags)
-- **Advanced filters**: All / Annotated / Empty / By class
+- **Advanced search** with multiple filters:
+  - Text search in image names and annotations
+  - Filter by class
+  - Filter by annotation size (min/max)
+  - Filter by date modified
+  - Filter by tags
+- **Basic filters**: All / Annotated / Empty / By class
 - **Smart navigation**: next unannotated image (N)
 - **Navigation history** (Alt+←/→)
 - **Complete keyboard navigation** (arrows, Home/End)
 - **Complete and customizable keyboard shortcuts**
+- **Mini-map** for visual dataset overview
+- **Image preview** on hover with annotation details
 
 ### 💾 Project Management
 - **Automatic state saving**
 - **Restore on restart**
 - **Export/Import complete projects** (backup/restore)
+- **Merge multiple datasets** with automatic class mapping
 - **Import YAML classes** (YOLO format)
-- **Export COCO** and **Pascal VOC**
+- **Export formats**: COCO, Pascal VOC, Preview, Report, Project
+- **Export history** with quick re-export
 - **Class templates** (save/load)
 - **Tags/metadata** for images
 - **Smart cache** for optimal performance
 - **Per-image modification history**
+- **Batch operations** on selected images (delete, tag, export)
+- **Multiple image selection** (Ctrl+Click)
 
 ### 🚀 Performance & Quality
 - **Advanced optimizations** (React.memo, useCallback, useMemo)
@@ -61,7 +78,18 @@ A modern and powerful image annotation tool for YOLO datasets, with an elegant u
 ### 🎯 Special Features
 - **YOLO pre-annotation**: Load a YOLO model to automatically pre-annotate
 - **Vision LLM Assistant**: Integration with vision LLM models (OpenAI, Claude, GGUF) to verify, annotate, and automatically modify annotations
-- **Fullscreen mode**: Total focus on annotation (F11)
+- **Workflow modes**: 
+  - Normal: Standard annotation mode
+  - Speed: Fast annotation with Quick Draw enabled
+  - Review: Review and validate annotations with measurements
+  - Precision: Precise annotation with measurements enabled
+- **Layout presets**: 
+  - Annotation Focus: Maximize canvas space
+  - Stats Focus: Show all statistics
+  - Balanced: Equal space for all panels
+  - Minimal: Minimal UI, maximum canvas
+  - Custom layouts: Save and reuse your own layouts
+- **Fullscreen mode**: Total focus on annotation (F11 or via Layout Manager)
 - **Grid view**: Fast visual navigation with annotation preview
 - **Detailed statistics**: Dataset progress, annotations by class, averages
 - **Automatic validation**: Error, warning, and duplicate detection
@@ -71,6 +99,9 @@ A modern and powerful image annotation tool for YOLO datasets, with an elegant u
 - **Annotation templates**: Save and reuse annotation configurations
 - **Annotation groups**: Group and manipulate multiple annotations together
 - **Collapsible panels**: Customizable interface with collapsible panels
+- **Theme customization**: Dark, Light, and Cyberpunk themes
+- **Batch image operations**: Select multiple images and perform batch actions
+- **Quick actions**: Hover actions on images (open, delete)
 
 ## 📋 Prerequisites
 
@@ -252,6 +283,14 @@ The `.exe` file will be created in the `release/` folder:
 | `Q` | Toggle Quick Draw Mode |
 | `M` | Show/Hide measurements |
 
+#### Interface & Layout
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+E` | Open Export menu |
+| `Ctrl+I` | Import project |
+| `Ctrl+M` | Merge datasets |
+| `Ctrl+F` | Toggle fullscreen canvas |
+
 #### Help
 | Shortcut | Action |
 |----------|--------|
@@ -277,6 +316,41 @@ The `.exe` file will be created in the `release/` folder:
 
 - **Complete export**: Menu → Export Project (saves everything: images, annotations, classes, tags, comments)
 - **Complete import**: Menu → Import Project (restores a complete project)
+- **Merge datasets**: Menu → Merge Datasets (combine multiple datasets with automatic class mapping)
+
+### Layout Management
+
+- **Layout presets**: Click "Layout" button to choose from presets
+- **Save custom layout**: Use "Save Current Layout" to save your preferred configuration
+- **Toggle panels**: Use "Hide Stats" to hide/show Statistics/Analytics/Validation panels
+- **Fullscreen canvas**: Use "Fullscreen Canvas" button or F11
+
+### Workflow Modes
+
+- **Normal**: Standard annotation workflow
+- **Speed**: Quick annotation mode with Quick Draw enabled
+- **Review**: Review mode with measurements enabled
+- **Precision**: Precision mode with measurements enabled
+
+### Batch Operations
+
+1. **Select multiple images**: Hold `Ctrl` (or `Cmd` on Mac) and click on images
+2. **Batch actions**: Use the bottom toolbar to:
+   - Export selected images
+   - Tag selected images
+   - Delete selected images
+3. **Clear selection**: Click the X button in the batch actions toolbar
+
+### Advanced Search
+
+1. Click **"Advanced"** button in the top bar
+2. Configure filters:
+   - Text search
+   - Class filter
+   - Size range (min/max)
+   - Date range
+   - Tag filter
+3. Click **"Search"** to apply filters
 
 ### Import Classes from YAML
 
@@ -440,9 +514,11 @@ This project is licensed under the **MIT License**. See the [LICENSE](../LICENSE
 ## 📞 Support
 
 For questions or issues:
-1. Check the documentation in `BUILD.md` and `QUICK_BUILD.md`
-2. Check GitHub issues (if applicable)
-3. Check the console logs
+1. Check the complete documentation in this file
+2. Check the [BUILD.md](BUILD.md) for build instructions
+3. Check the [CODE_DOCUMENTATION.md](CODE_DOCUMENTATION.md) for code architecture
+4. Check the [CHANGELOG.md](CHANGELOG.md) for version history
+5. Check the console logs for errors
 
 ---
 

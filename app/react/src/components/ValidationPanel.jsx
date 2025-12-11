@@ -1,3 +1,22 @@
+/**
+ * @fileoverview ValidationPanel Component - Annotation Validation and Quality Checks
+ * 
+ * This component provides annotation validation with:
+ * - Error detection (out of bounds, invalid format)
+ * - Warning detection (overlapping, too small/large)
+ * - Duplicate detection
+ * - Quality score calculation
+ * - Fix suggestions
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Array<Object>} props.annotations - Current image annotations
+ * @param {string} props.currentImagePath - Current image file path
+ * @param {string} props.datasetPath - Current dataset path
+ * @param {Function} props.onFixAnnotation - Function to fix/remove problematic annotation
+ * @returns {JSX.Element} The rendered validation panel component
+ */
+
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
@@ -128,7 +147,15 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
         <CollapsiblePanel 
             title="Validation" 
             icon={issues.length === 0 && !validating ? CheckCircle : AlertTriangle}
-            containerStyle={{ maxHeight: '400px', overflowY: 'auto' }}
+            containerStyle={{ 
+                maxHeight: '400px', 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                background: 'rgba(20, 20, 35, 0.2)',
+                backdropFilter: 'blur(5px)',
+                width: '100%',
+                boxSizing: 'border-box'
+            }}
             headerStyle={{ marginBottom: 0 }}
         >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>

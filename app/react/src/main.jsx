@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Main Entry Point - React Application Bootstrap
+ * 
+ * This is the main entry point for the React application.
+ * It mounts the App component to the DOM root element.
+ * 
+ * @module main
+ */
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'

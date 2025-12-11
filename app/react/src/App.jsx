@@ -1,7 +1,25 @@
+/**
+ * @fileoverview Main Application Component
+ * 
+ * Lama Worlds Annotation Studio - Main React Application
+ * 
+ * This is the root component of the application. It manages:
+ * - Dataset loading and management
+ * - Image navigation and annotation state
+ * - UI state (panels, modals, layouts)
+ * - Communication with the FastAPI backend
+ * - Keyboard shortcuts and user interactions
+ * 
+ * @author StriikzLeLama
+ * @version 1.1.0
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Settings } from 'lucide-react';
+import { Settings, Eye, EyeOff, BarChart3, Layout, FolderOpen } from 'lucide-react';
+
+// Component Imports
 import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
 import AnnotationCanvas from './components/AnnotationCanvas';
@@ -15,24 +33,50 @@ import AnnotationTemplates from './components/AnnotationTemplates';
 import AnnotationGroups from './components/AnnotationGroups';
 import ExportPreview from './components/ExportPreview';
 import VisionLLMModal from './components/VisionLLMModal';
+import DatasetMergeModal from './components/DatasetMergeModal';
+import LayoutManager from './components/LayoutManager';
+import MiniMap from './components/MiniMap';
+import WorkflowMode from './components/WorkflowMode';
+import AdvancedSearch from './components/AdvancedSearch';
+import BatchImageActions from './components/BatchImageActions';
+import ImagePreviewTooltip from './components/ImagePreviewTooltip';
+import ThemeManager from './components/ThemeManager';
+
+// Hooks
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useSettings, loadSettings } from './hooks/useSettings';
 import './styles/index.css';
 
-// Configure Axios
+// ============================================================================
+// API Configuration
+// ============================================================================
+
+/**
+ * Backend API URL
+ * @constant {string}
+ */
 const API_URL = 'http://localhost:8000';
+
+/**
+ * Axios instance configured for backend communication
+ * @constant {AxiosInstance}
+ */
 const api = axios.create({ baseURL: API_URL, timeout: 10000 });
 
-// Add request interceptor for better error handling
+/**
+ * Response interceptor for error handling and automatic retry
+ * Handles network errors and connection issues gracefully
+ */
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Handle connection errors
         if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
             console.error('Backend connection error:', error);
-            // Show user-friendly error
+            
+            // Retry once after 2 seconds
             if (error.config && !error.config._retry) {
                 error.config._retry = true;
-                // Try to reconnect after a delay
                 return new Promise((resolve) => {
                     setTimeout(() => {
                         resolve(api.request(error.config));
@@ -44,870 +88,472 @@ api.interceptors.response.use(
     }
 );
 
+// ============================================================================
+// Main Application Component
+// ============================================================================
+
+/**
+ * Main Application Component
+ * 
+ * Manages the entire application state and coordinates all components.
+ * 
+ * @component
+ * @returns {JSX.Element} The rendered application
+ */
 function App() {
-    const [datasetPath, setDatasetPath] = useState('');
-    const [images, setImages] = useState([]);
-    const [currentImageIndex, setCurrentImageIndex] = useState(-1);
-    const [annotations, setAnnotations] = useState([]);
-    const [classes, setClasses] = useState([]);
-    const [selectedClassId, setSelectedClassId] = useState(0);
-    const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
-    const [selectedAnnotationIds, setSelectedAnnotationIds] = useState(new Set()); // Multiple selection
-    const [navigationHistory, setNavigationHistory] = useState([]); // History for back/forward navigation
-    const [historyIndex, setHistoryIndex] = useState(-1);
-    const [loading, setLoading] = useState(false);
-    const [saveStatus, setSaveStatus] = useState('Saved');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterAnnotated, setFilterAnnotated] = useState(null); // null = all, true = annotated, false = not annotated
-    const [filterClassId, setFilterClassId] = useState(null); // null = all classes, number = specific class
-    const [copiedAnnotation, setCopiedAnnotation] = useState(null);
-    const annotationCache = useRef({}); // Cache for annotations
-    const [annotatedImages, setAnnotatedImages] = useState(new Set()); // Set of image paths that have annotations
-    const [backendError, setBackendError] = useState(null); // Backend connection error
-    const [showShortcuts, setShowShortcuts] = useState(false); // Show keyboard shortcuts help
-    const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotations visibility
-    const [isFullscreen, setIsFullscreen] = useState(false); // Fullscreen mode
-    const [imageTags, setImageTags] = useState({}); // Tags for images: { imagePath: [tag1, tag2, ...] }
-    const [annotationComments, setAnnotationComments] = useState({}); // Comments for annotations: { annotationId: "comment text" }
-    const [imageHistory, setImageHistory] = useState({}); // History per image: { imagePath: [{timestamp, annotations, user?}] }
-    const [autoSaveHistory, setAutoSaveHistory] = useState([]); // Auto-save history: [{timestamp, datasetPath, state}]
-    const [searchInAnnotations, setSearchInAnnotations] = useState(false); // Search in annotations toggle
-    const [yoloModelPath, setYoloModelPath] = useState(''); // YOLO model path for pre-annotation
-    const [yoloConfidence, setYoloConfidence] = useState(0.25); // YOLO confidence threshold
-    const [quickDrawMode, setQuickDrawMode] = useState(false); // Quick draw mode (class stays selected)
-    const [annotationGroups, setAnnotationGroups] = useState({}); // { groupId: [annotationIds] }
-    const [selectedGroupId, setSelectedGroupId] = useState(null); // Currently selected group
-    const [annotationTemplates, setAnnotationTemplates] = useState([]); // Saved templates
-    const [showMeasurements, setShowMeasurements] = useState(false); // Show annotation measurements
-    const [incrementalSaveHistory, setIncrementalSaveHistory] = useState([]); // Incremental save history
-    const [showExportPreview, setShowExportPreview] = useState(false); // Show export preview
-    const [showSettings, setShowSettings] = useState(false); // Show settings panel
-    const [showVisionLLM, setShowVisionLLM] = useState(false); // Show Vision LLM modal
-    const [recentClasses, setRecentClasses] = useState([]); // Recent classes used
-    const [snapToGrid, setSnapToGrid] = useState(false); // Snap to grid state
+    // ========================================================================
+    // State Management - Dataset & Images
+    // ========================================================================
     
-    // Settings system
+    /** @type {[string, Function]} Current dataset path */
+    const [datasetPath, setDatasetPath] = useState('');
+    
+    /** @type {[string[], Function]} Array of image file paths */
+    const [images, setImages] = useState([]);
+    
+    /** @type {[number, Function]} Current image index in the images array */
+    const [currentImageIndex, setCurrentImageIndex] = useState(-1);
+    
+    /** @type {[Set<string>, Function]} Set of image paths that have annotations */
+    const [annotatedImages, setAnnotatedImages] = useState(new Set());
+    
+    /** @type {[Set<string>, Function]} Set of selected image paths for batch operations */
+    const [selectedImages, setSelectedImages] = useState(new Set());
+    
+    // ========================================================================
+    // State Management - Annotations
+    // ========================================================================
+    
+    /** @type {[Array<Object>, Function]} Current image annotations */
+    const [annotations, setAnnotations] = useState([]);
+    
+    /** @type {[string|null, Function]} Currently selected annotation ID */
+    const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
+    
+    /** @type {[Set<string>, Function]} Set of selected annotation IDs for multi-selection */
+    const [selectedAnnotationIds, setSelectedAnnotationIds] = useState(new Set());
+    
+    /** @type {React.MutableRefObject<Object>} Cache for annotations to improve performance */
+    const annotationCache = useRef({});
+    
+    /** @type {[Object, Function]} Comments for annotations: { annotationId: "comment text" } */
+    const [annotationComments, setAnnotationComments] = useState({});
+    
+    /** @type {[Object, Function]} Annotation groups: { groupId: [annotationIds] } */
+    const [annotationGroups, setAnnotationGroups] = useState({});
+    
+    /** @type {[string|null, Function]} Currently selected group ID */
+    const [selectedGroupId, setSelectedGroupId] = useState(null);
+    
+    /** @type {[Object|null, Function]} Copied annotation for paste operation */
+    const [copiedAnnotation, setCopiedAnnotation] = useState(null);
+    
+    // ========================================================================
+    // State Management - Classes
+    // ========================================================================
+    
+    /** @type {[Array<Object>, Function]} Array of annotation classes */
+    const [classes, setClasses] = useState([]);
+    
+    /** @type {[number, Function]} Currently selected class ID */
+    const [selectedClassId, setSelectedClassId] = useState(0);
+    
+    /** @type {[Array<number>, Function]} Recently used class IDs */
+    const [recentClasses, setRecentClasses] = useState([]);
+    
+    // ========================================================================
+    // State Management - Navigation & History
+    // ========================================================================
+    
+    /** @type {[Array<number>, Function]} Navigation history for back/forward */
+    const [navigationHistory, setNavigationHistory] = useState([]);
+    
+    /** @type {[number, Function]} Current position in navigation history */
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    
+    /** @type {[Object, Function]} History per image: { imagePath: [{timestamp, annotations}] } */
+    const [imageHistory, setImageHistory] = useState({});
+    
+    // ========================================================================
+    // State Management - Search & Filters
+    // ========================================================================
+    
+    /** @type {[string, Function]} Current search query */
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    /** @type {[boolean|null, Function]} Filter by annotation status: null=all, true=annotated, false=empty */
+    const [filterAnnotated, setFilterAnnotated] = useState(null);
+    
+    /** @type {[number|null, Function]} Filter by class ID: null=all classes, number=specific class */
+    const [filterClassId, setFilterClassId] = useState(null);
+    
+    /** @type {[boolean, Function]} Toggle search in annotations content */
+    const [searchInAnnotations, setSearchInAnnotations] = useState(false);
+    
+    /** @type {[Object, Function]} Advanced search filters */
+    const [advancedFilters, setAdvancedFilters] = useState({});
+    
+    // ========================================================================
+    // State Management - UI State
+    // ========================================================================
+    
+    /** @type {[boolean, Function]} Loading state */
+    const [loading, setLoading] = useState(false);
+    
+    /** @type {[string, Function]} Save status message */
+    const [saveStatus, setSaveStatus] = useState('Saved');
+    
+    /** @type {[string|null, Function]} Backend connection error message */
+    const [backendError, setBackendError] = useState(null);
+    
+    /** @type {[boolean, Function]} Show keyboard shortcuts help modal */
+    const [showShortcuts, setShowShortcuts] = useState(false);
+    
+    /** @type {[boolean, Function]} Show/hide annotations on canvas */
+    const [showAnnotations, setShowAnnotations] = useState(true);
+    
+    /** @type {[boolean, Function]} Fullscreen mode state */
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    
+    /** @type {[boolean, Function]} Show statistics/analytics/validation panels */
+    const [showStatsPanels, setShowStatsPanels] = useState(true);
+    
+    /** @type {[Object, Function]} Current layout configuration */
+    const [currentLayout, setCurrentLayout] = useState({
+        showSidebar: true,
+        showRightPanel: true,
+        showStatsPanels: true,
+        sidebarWidth: 250,
+        rightPanelWidth: 320
+    });
+    
+    /** @type {[string, Function]} Current workflow mode: 'normal', 'speed', 'review', 'precision' */
+    const [workflowMode, setWorkflowMode] = useState('normal');
+    
+    /** @type {[boolean, Function]} Show mini map */
+    const [showMiniMap, setShowMiniMap] = useState(false);
+    
+    /** @type {[Object|null, Function]} Image preview data for hover tooltip */
+    const [imagePreview, setImagePreview] = useState(null);
+    
+    // ========================================================================
+    // State Management - Modals & Panels
+    // ========================================================================
+    
+    /** @type {[boolean, Function]} Show settings panel */
+    const [showSettings, setShowSettings] = useState(false);
+    
+    /** @type {[boolean, Function]} Show Vision LLM modal */
+    const [showVisionLLM, setShowVisionLLM] = useState(false);
+    
+    /** @type {[boolean, Function]} Show dataset merge modal */
+    const [showDatasetMerge, setShowDatasetMerge] = useState(false);
+    
+    /** @type {[boolean, Function]} Show export preview */
+    const [showExportPreview, setShowExportPreview] = useState(false);
+    
+    /** @type {[boolean, Function]} Show annotation measurements */
+    const [showMeasurements, setShowMeasurements] = useState(false);
+    
+    // ========================================================================
+    // State Management - Features & Tools
+    // ========================================================================
+    
+    /** @type {[Object, Function]} Tags for images: { imagePath: [tag1, tag2, ...] } */
+    const [imageTags, setImageTags] = useState({});
+    
+    /** @type {[Array<Object>, Function]} Saved annotation templates */
+    const [annotationTemplates, setAnnotationTemplates] = useState([]);
+    
+    /** @type {[boolean, Function]} Quick draw mode (class stays selected after annotation) */
+    const [quickDrawMode, setQuickDrawMode] = useState(false);
+    
+    /** @type {[boolean, Function]} Snap to grid mode */
+    const [snapToGrid, setSnapToGrid] = useState(false);
+    
+    /** @type {[string, Function]} YOLO model path for pre-annotation */
+    const [yoloModelPath, setYoloModelPath] = useState('');
+    
+    /** @type {[number, Function]} YOLO confidence threshold (0.0 - 1.0) */
+    const [yoloConfidence, setYoloConfidence] = useState(0.25);
+    
+    /** @type {[Array<Object>, Function]} Auto-save history */
+    const [autoSaveHistory, setAutoSaveHistory] = useState([]);
+    
+    /** @type {[Array<Object>, Function]} Incremental save history */
+    const [incrementalSaveHistory, setIncrementalSaveHistory] = useState([]);
+    
+    /** @type {[string, Function]} Current theme: 'dark', 'light', 'cyberpunk' */
+    const [currentTheme, setCurrentTheme] = useState('dark');
+    
+    // ========================================================================
+    // Hooks & External State
+    // ========================================================================
+    
+    /** Settings system hook */
     const { settings, updateSetting, updateSettings, getSetting } = useSettings();
     
-    // Undo/Redo system - initialize with empty array
+    /** Undo/Redo system hook */
     const undoRedoHook = useUndoRedo([]);
     const { setState: setUndoRedoState, undo, redo, canUndo, canRedo } = undoRedoHook;
 
-    // Save state to localStorage
+    // ========================================================================
+    // Utility Functions
+    // ========================================================================
+
+    /**
+     * Save application state to localStorage
+     * Persists dataset path, classes, and UI preferences
+     */
     const saveState = useCallback(() => {
         const state = {
             datasetPath,
-            currentImageIndex,
+            classes,
             selectedClassId,
-            timestamp: Date.now()
+            currentImageIndex,
+            imageTags,
+            annotationComments,
+            currentLayout,
+            workflowMode,
+            currentTheme
         };
+        
         try {
-            localStorage.setItem('annotationStudio_state', JSON.stringify(state));
+            localStorage.setItem('app_state', JSON.stringify(state));
         } catch (err) {
             console.error('Failed to save state:', err);
         }
-    }, [datasetPath, currentImageIndex, selectedClassId]);
+    }, [datasetPath, classes, selectedClassId, currentImageIndex, imageTags, annotationComments, currentLayout, workflowMode, currentTheme]);
 
-    // Restore state from localStorage on mount
-    useEffect(() => {
-        const restoreState = async () => {
-            try {
-                const savedState = localStorage.getItem('annotationStudio_state');
-                if (savedState) {
-                    const state = JSON.parse(savedState);
-                    // Verify dataset path still exists before restoring
-                    if (state.datasetPath) {
-                        try {
-                            // Verify path exists and load dataset
-                            const res = await api.post('/load_dataset', { path: state.datasetPath });
-                            if (res.data.images && res.data.images.length > 0) {
-                                setDatasetPath(state.datasetPath);
-                                setImages(res.data.images);
-                                
-                                // Restore image index if valid
-                                const imageIndex = Math.min(state.currentImageIndex || 0, res.data.images.length - 1);
-                                setCurrentImageIndex(imageIndex >= 0 ? imageIndex : 0);
+    // ========================================================================
+    // Dataset Management Functions
+    // ========================================================================
 
-                                // Restore annotation comments
-                                try {
-                                    const commentsKey = `annotation_comments_${state.datasetPath}`;
-                                    const savedComments = localStorage.getItem(commentsKey);
-                                    if (savedComments) {
-                                        setAnnotationComments(JSON.parse(savedComments));
-                                    }
-                                } catch (err) {
-                                    console.error('Failed to restore comments:', err);
-                                }
-
-                                // Restore image tags
-                                try {
-                                    const tagsKey = `image_tags_${state.datasetPath}`;
-                                    const savedTags = localStorage.getItem(tagsKey);
-                                    if (savedTags) {
-                                        setImageTags(JSON.parse(savedTags));
-                                    }
-                                } catch (err) {
-                                    console.error('Failed to restore tags:', err);
-                                }
-
-                                // Load classes
-                                const clsRes = await api.post('/load_classes', { path: state.datasetPath });
-                                if (clsRes.data.classes.length > 0) {
-                                    setClasses(clsRes.data.classes);
-                                    // Restore selected class if valid
-                                    const classId = state.selectedClassId || 0;
-                                    if (clsRes.data.classes.find(c => c.id === classId)) {
-                                        setSelectedClassId(classId);
-                                    } else {
-                                        setSelectedClassId(0);
-                                    }
-                                } else {
-                                    setClasses([{ id: 0, name: 'default', color: '#00e0ff' }]);
-                                    setSelectedClassId(0);
-                                }
-                                
-                                // Load annotated images list
-                                try {
-                                    const annotatedRes = await api.post('/get_annotated_images', { dataset_path: state.datasetPath });
-                                    if (annotatedRes.data.annotated_images) {
-                                        setAnnotatedImages(new Set(annotatedRes.data.annotated_images));
-                                    }
-                                } catch (err) {
-                                    console.error('Failed to load annotated images:', err);
-                                    // Continue without annotated images list
-                                }
-                            } else {
-                                // Dataset exists but no images
-                                localStorage.removeItem('annotationStudio_state');
-                            }
-                        } catch (err) {
-                            console.error('Failed to restore dataset:', err);
-                            // Clear invalid state
-                            localStorage.removeItem('annotationStudio_state');
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to restore state:', err);
-            }
-        };
+    /**
+     * Load dataset from a folder path
+     * Scans for images and loads existing annotations
+     * 
+     * @param {string} path - Path to the dataset folder
+     */
+    const loadDataset = useCallback(async (path) => {
+        if (!path) return;
         
-        // Wait a bit for API to be ready
-        const timer = setTimeout(() => {
-            restoreState();
-        }, 500);
+        setLoading(true);
+        setBackendError(null);
         
-        return () => clearTimeout(timer);
-    }, []); // Only run on mount
-
-    // Listen for backend errors and ready status from Electron
-    useEffect(() => {
-        // Listen for backend errors from main process
-        if (window.electronAPI && window.electronAPI.onBackendError) {
-            const cleanupError = window.electronAPI.onBackendError((error) => {
-                console.error('Backend error received:', error);
-                setBackendError(error);
+        try {
+            // Load images - request all images by setting a very large page_size
+            const imagesRes = await api.post('/load_dataset', { path: path }, { 
+                params: { page: 0, page_size: 999999 } 
             });
+            const imageList = imagesRes.data.images || [];
+            setImages(imageList);
             
-            // Listen for backend ready status
-            let cleanupReady = null;
-            if (window.electronAPI.onBackendReady) {
-                cleanupReady = window.electronAPI.onBackendReady(() => {
-                    console.log('Backend is ready!');
-                    setBackendError(null);
-                });
-            }
+            // Load classes
+            const classesRes = await api.post('/load_classes', { path: path });
+            const classList = classesRes.data.classes || [];
+            setClasses(classList);
             
-            return () => {
-                if (cleanupError) cleanupError();
-                if (cleanupReady) cleanupReady();
-            };
-        }
-        
-        // Check backend connection periodically
-        let checkInterval;
-        const checkBackend = async () => {
-            try {
-                await api.get('/', { timeout: 2000 });
-                setBackendError(null);
-            } catch (err) {
-                if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
-                    // Don't set error immediately, wait for IPC message from main process
-                    // setBackendError('Cannot connect to backend server. Please check the console for details.');
-                }
-            }
-        };
-        
-        // Check after a delay to allow backend to start, then periodically
-        const initialTimer = setTimeout(() => {
-            checkBackend();
-            checkInterval = setInterval(checkBackend, 5000); // Check every 5 seconds
-        }, 3000);
-        
-        return () => {
-            clearTimeout(initialTimer);
-            if (checkInterval) clearInterval(checkInterval);
-        };
-    }, []);
-
-    // Ensure currentImageIndex is valid when images are loaded
-    useEffect(() => {
-        if (Array.isArray(images) && images.length > 0) {
-            if (currentImageIndex < 0 || currentImageIndex >= images.length) {
-                console.log('Fixing invalid currentImageIndex:', currentImageIndex, '-> 0');
+            // Load annotated images
+            const annotatedRes = await api.post('/get_annotated_images', { dataset_path: path });
+            const annotatedList = annotatedRes.data.annotated_images || [];
+            setAnnotatedImages(new Set(annotatedList));
+            
+            // Set first image as current if available
+            if (imageList.length > 0) {
                 setCurrentImageIndex(0);
             }
-        } else if (images.length === 0) {
-            setCurrentImageIndex(-1);
-        }
-    }, [images, currentImageIndex]);
-
-    // Save state whenever relevant values change
-    useEffect(() => {
-        if (datasetPath) {
-            saveState();
-        }
-    }, [datasetPath, currentImageIndex, selectedClassId, saveState]);
-
-    // Debounce timer for auto-save
-    const saveDebounceTimer = useRef(null);
-    
-    // Define saveAnnotations first using useCallback with debouncing
-    const saveAnnotations = useCallback(async (newAnnotations, addToHistory = true, immediate = false) => {
-        // Validate inputs
-        if (!Array.isArray(newAnnotations)) {
-            console.error('saveAnnotations: newAnnotations must be an array');
-            return;
-        }
-        
-        if (currentImageIndex < 0 || !Array.isArray(images) || currentImageIndex >= images.length || !datasetPath || !images[currentImageIndex]) {
-            console.warn('saveAnnotations: Invalid state, skipping save');
-            return;
-        }
-        
-        // Validate annotations before saving
-        const validAnnotations = newAnnotations.filter(ann => {
-            if (!ann || typeof ann !== 'object') return false;
-            // Check required fields
-            if (typeof ann.x !== 'number' || typeof ann.y !== 'number' || 
-                typeof ann.width !== 'number' || typeof ann.height !== 'number' ||
-                typeof ann.class_id !== 'number') {
-                console.warn('Invalid annotation format:', ann);
-                return false;
-            }
-            // Check for valid values
-            if (isNaN(ann.x) || isNaN(ann.y) || isNaN(ann.width) || isNaN(ann.height) || isNaN(ann.class_id)) {
-                console.warn('Annotation contains NaN values:', ann);
-                return false;
-            }
-            return true;
-        });
-        
-        // Update state immediately for UI responsiveness
-        setAnnotations(validAnnotations);
-        const currentImagePath = images[currentImageIndex];
-        if (annotationCache && annotationCache.current && currentImagePath) {
-            annotationCache.current[currentImagePath] = validAnnotations;
-        }
-        
-        // Add to undo history
-        if (addToHistory && Array.isArray(annotations)) {
-            setUndoRedoState(annotations);
-        }
-        
-        // Add to image history
-        if (currentImagePath && addToHistory && Array.isArray(annotations)) {
-            setImageHistory(prev => {
-                if (!prev || typeof prev !== 'object') prev = {};
-                const imageHist = Array.isArray(prev[currentImagePath]) ? prev[currentImagePath] : [];
-                return {
-                    ...prev,
-                    [currentImagePath]: [
-                        ...imageHist,
-                        {
-                            timestamp: Date.now(),
-                            annotations: [...annotations],
-                            annotationCount: annotations.length
-                        }
-                    ].slice(-10) // Keep last 10 history entries
-                };
-            });
-        }
-        
-        // Clear previous debounce timer
-        if (saveDebounceTimer.current) {
-            clearTimeout(saveDebounceTimer.current);
-        }
-        
-        // Debounced save function
-        const performSave = async () => {
-            setSaveStatus('Saving...');
-            try {
-                if (!currentImagePath) {
-                    console.error('No image path available for saving');
-                    setSaveStatus('Error');
-                    return;
-                }
-                
-                await api.post('/save_annotation', {
-                    image_name: currentImagePath,
-                    dataset_path: datasetPath,
-                    boxes: validAnnotations
-                });
-                
-                // Update annotated images set
-                setAnnotatedImages(prev => {
-                    const newSet = new Set(prev);
-                    if (validAnnotations.length > 0) {
-                        newSet.add(currentImagePath);
-                    } else {
-                        newSet.delete(currentImagePath);
-                    }
-                    return newSet;
-                });
-                
-                // Auto-save to history
-                try {
-                    const autoSaveEntry = {
-                        timestamp: Date.now(),
-                        datasetPath,
-                        currentImageIndex,
-                        imageCount: Array.isArray(images) ? images.length : 0,
-                        annotationCount: validAnnotations.length
-                    };
-                    setAutoSaveHistory(prev => {
-                        const prevArray = Array.isArray(prev) ? prev : [];
-                        return [...prevArray, autoSaveEntry].slice(-50);
-                    });
-                    try {
-                        localStorage.setItem('autoSaveHistory', JSON.stringify([...autoSaveHistory, autoSaveEntry].slice(-50)));
-                    } catch (storageErr) {
-                        console.warn('Failed to save to localStorage:', storageErr);
-                    }
+            
+            setDatasetPath(path);
                 } catch (err) {
-                    console.error('Failed to save auto-save history:', err);
-                }
+            console.error('Failed to load dataset:', err);
+            setBackendError(err.message || 'Failed to connect to backend. Make sure Python is installed and dependencies are installed.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    /**
+     * Open a dataset folder using Electron's dialog.
+     */
+    const handleOpenDataset = useCallback(async () => {
+        try {
+            if (!window.electronAPI || !window.electronAPI.selectFolder) {
+                alert("Electron API not available. Please run in Electron.");
+                return;
+            }
+            const folderPath = await window.electronAPI.selectFolder();
+            if (folderPath) {
+                await loadDataset(folderPath);
+            }
+        } catch (err) {
+            console.error('Failed to open dataset:', err);
+            alert('Failed to open dataset: ' + (err.message || 'Unknown error'));
+        }
+    }, [loadDataset]);
+
+    /**
+     * Load application state from localStorage
+     * Restores previous session state
+     */
+    const loadState = useCallback(async () => {
+        try {
+            const saved = localStorage.getItem('app_state');
+            if (saved) {
+                const state = JSON.parse(saved);
                 
-                setSaveStatus('Saved');
+                // Restore UI state first (non-blocking)
+                if (state.classes) setClasses(state.classes);
+                if (state.selectedClassId !== undefined) setSelectedClassId(state.selectedClassId);
+                if (state.imageTags) setImageTags(state.imageTags);
+                if (state.annotationComments) setAnnotationComments(state.annotationComments);
+                if (state.currentLayout) setCurrentLayout(state.currentLayout);
+                if (state.workflowMode) setWorkflowMode(state.workflowMode);
+                if (state.currentTheme) setCurrentTheme(state.currentTheme);
                 
-                // Auto-advance if enabled - use setCurrentImageIndex directly to avoid circular dependency
-                if (getSetting('autoAdvance', false) && validAnnotations.length > 0) {
-                    const delay = getSetting('autoAdvanceDelay', 500);
-                    setTimeout(() => {
-                        // Find next unannotated image
-                        const nextUnannotated = images.findIndex((img, idx) => 
-                            idx > currentImageIndex && !annotatedImages.has(img)
-                        );
-                        if (nextUnannotated >= 0) {
-                            setCurrentImageIndex(nextUnannotated);
-                        } else if (currentImageIndex < images.length - 1) {
-                            // If no unannotated, just go to next
-                            setCurrentImageIndex(currentImageIndex + 1);
+                // Try to load dataset if path exists (non-blocking, with error handling)
+                if (state.datasetPath) {
+                    setDatasetPath(state.datasetPath);
+                    // Load dataset asynchronously without blocking render
+                    loadDataset(state.datasetPath).catch(err => {
+                        console.warn('Failed to auto-load dataset:', err);
+                        // Clear invalid path
+                        setDatasetPath('');
+                    }).then(() => {
+                        // Restore image index after images are loaded
+                        if (state.currentImageIndex !== undefined && state.currentImageIndex >= 0) {
+                            setTimeout(() => {
+                                setCurrentImageIndex(state.currentImageIndex);
+                            }, 500); // Wait for images to load
                         }
-                    }, delay);
-                }
-                
-                // Update recent classes
-                if (validAnnotations.length > 0 && getSetting('showRecentClasses', true)) {
-                    const usedClassIds = [...new Set(validAnnotations.map(a => a.class_id))];
-                    setRecentClasses(prev => {
-                        const newRecent = [...prev];
-                        usedClassIds.forEach(classId => {
-                            const index = newRecent.indexOf(classId);
-                            if (index >= 0) {
-                                newRecent.splice(index, 1);
-                            }
-                            newRecent.unshift(classId);
-                        });
-                        return newRecent.slice(0, getSetting('recentClassesCount', 5));
                     });
                 }
-            } catch (err) {
-                console.error("Failed to save", err);
-                setSaveStatus('Error');
-                setTimeout(() => setSaveStatus('Saved'), 2000);
             }
-        };
-        
-        // Save immediately or debounce
-        if (immediate) {
-            await performSave();
-        } else {
-            // Debounce save by 500ms for better performance
-            saveDebounceTimer.current = setTimeout(performSave, 500);
-            setSaveStatus('Saving...');
-        }
-    }, [currentImageIndex, images, datasetPath, annotations, setUndoRedoState, autoSaveHistory, getSetting, annotatedImages]);
-    
-    // Undo/Redo handlers
-    const handleUndo = useCallback(() => {
-        if (canUndo) {
-            const previousState = undo();
-            if (previousState) {
-                saveAnnotations(previousState, false);
-            }
-        }
-    }, [canUndo, undo, saveAnnotations]);
-    
-    const handleRedo = useCallback(() => {
-        if (canRedo) {
-            const nextState = redo();
-            if (nextState) {
-                saveAnnotations(nextState, false);
-            }
-        }
-    }, [canRedo, redo, saveAnnotations]);
-    
-    // Copy/Paste annotations - Enhanced to support multiple annotations
-    const [copiedAnnotations, setCopiedAnnotations] = useState([]); // Support multiple copied annotations
-    
-    const copyAnnotation = useCallback(() => {
-        if (!Array.isArray(annotations)) return;
-        
-        // Copy multiple if selected, otherwise copy single
-        if (selectedAnnotationIds && selectedAnnotationIds.size > 0) {
-            const annsToCopy = annotations.filter(a => a && a.id && selectedAnnotationIds.has(a.id));
-            if (annsToCopy.length > 0) {
-                setCopiedAnnotations(annsToCopy);
-                setCopiedAnnotation(annsToCopy[0]); // Keep for backward compatibility
-            }
-        } else if (selectedAnnotationId) {
-            const ann = annotations.find(a => a && a.id === selectedAnnotationId);
-            if (ann && typeof ann === 'object') {
-                setCopiedAnnotations([ann]);
-                setCopiedAnnotation(ann);
-            }
-        }
-    }, [selectedAnnotationId, selectedAnnotationIds, annotations]);
-    
-    const pasteAnnotation = useCallback(() => {
-        if (!Array.isArray(annotations)) return;
-        
-        // Use multiple copied annotations if available
-        const annsToPaste = copiedAnnotations.length > 0 ? copiedAnnotations : 
-                           (copiedAnnotation ? [copiedAnnotation] : []);
-        
-        if (annsToPaste.length === 0) return;
-        
-        // Validate and create new annotations with offset
-        const newAnns = [];
-        const offsetX = 20;
-        const offsetY = 20;
-        
-        annsToPaste.forEach((ann, idx) => {
-            if (ann && typeof ann === 'object' &&
-                typeof ann.x === 'number' && typeof ann.y === 'number' &&
-                typeof ann.width === 'number' && typeof ann.height === 'number' &&
-                typeof ann.class_id === 'number') {
-                newAnns.push({
-                    ...ann,
-                    id: uuidv4(),
-                    x: (ann.x || 0) + offsetX + (idx * 5), // Offset slightly with variation
-                    y: (ann.y || 0) + offsetY + (idx * 5)
-                });
-            }
-        });
-        
-        if (newAnns.length > 0) {
-            saveAnnotations([...annotations, ...newAnns]);
-            // Select the pasted annotations
-            setSelectedAnnotationIds(new Set(newAnns.map(a => a.id)));
-        } else {
-            console.warn('Cannot paste: invalid annotation format');
-        }
-    }, [copiedAnnotation, copiedAnnotations, annotations, saveAnnotations]);
-
-    // Save annotations before changing image
-    const saveCurrentAnnotations = useCallback(async () => {
-        if (currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] && datasetPath) {
+        } catch (err) {
+            console.error('Failed to load state:', err);
+            // Clear potentially corrupted state
             try {
-                await api.post('/save_annotation', {
-                    image_name: images[currentImageIndex],
-                    dataset_path: datasetPath,
-                    boxes: annotations
-                });
-                // Update cache
-                annotationCache.current[images[currentImageIndex]] = annotations;
-            } catch (err) {
-                console.error("Failed to save annotations before image change:", err);
+                localStorage.removeItem('app_state');
+            } catch (e) {
+                console.error('Failed to clear corrupted state:', e);
             }
         }
-    }, [currentImageIndex, images, datasetPath, annotations]);
+    }, [loadDataset]);
 
-    // Change image with auto-save
-    const changeImageIndex = useCallback(async (newIndex, addToHistory = true) => {
-        // Validate inputs
-        if (typeof newIndex !== 'number' || isNaN(newIndex)) {
-            console.warn('changeImageIndex: Invalid index', newIndex);
-            return;
-        }
+    // Load state on mount
+    useEffect(() => {
+        loadState();
+    }, [loadState]);
+
+    // Save state when relevant values change
+    useEffect(() => {
+        saveState();
+    }, [saveState]);
+
+    /**
+     * Change current image index with history tracking
+     * 
+     * @param {number} newIndex - New image index
+     */
+    const changeImageIndex = useCallback((newIndex) => {
+        if (newIndex < 0 || newIndex >= images.length) return;
         
-        if (newIndex === currentImageIndex) return;
-        
-        if (!Array.isArray(images) || newIndex < 0 || newIndex >= images.length) {
-            console.warn('changeImageIndex: Index out of bounds', newIndex, images.length);
-            return;
-        }
-        
-        // Save current annotations before changing
-        if (currentImageIndex >= 0 && Array.isArray(images) && images[currentImageIndex] && datasetPath) {
-            try {
-                await saveCurrentAnnotations();
-            } catch (err) {
-                console.error('Failed to save annotations before image change:', err);
-            }
-        }
-        
-        // Add to navigation history
-        if (addToHistory && currentImageIndex >= 0 && Array.isArray(navigationHistory)) {
-            const newHistory = navigationHistory.slice(0, Math.max(0, historyIndex + 1));
+        // Add to history
+        setNavigationHistory(prev => {
+            const newHistory = prev.slice(0, historyIndex + 1);
             newHistory.push(currentImageIndex);
-            setNavigationHistory(newHistory);
-            setHistoryIndex(newHistory.length - 1);
-        }
+            return newHistory;
+        });
+        setHistoryIndex(prev => prev + 1);
         
         setCurrentImageIndex(newIndex);
-        setSelectedAnnotationId(null);
-        setSelectedAnnotationIds(new Set());
-    }, [currentImageIndex, images, datasetPath, saveCurrentAnnotations, navigationHistory, historyIndex]);
-    
-    // Navigation history functions
-    const navigateBack = useCallback(() => {
-        if (historyIndex >= 0 && navigationHistory[historyIndex] !== undefined) {
-            const prevIndex = navigationHistory[historyIndex];
-            setHistoryIndex(historyIndex - 1);
-            changeImageIndex(prevIndex, false);
-        }
-    }, [historyIndex, navigationHistory, changeImageIndex]);
-    
-    const navigateForward = useCallback(() => {
-        if (historyIndex < navigationHistory.length - 1) {
-            const nextIndex = navigationHistory[historyIndex + 1];
-            setHistoryIndex(historyIndex + 1);
-            changeImageIndex(nextIndex, false);
-        }
-    }, [historyIndex, navigationHistory, changeImageIndex]);
-    
-    const canNavigateBack = historyIndex >= 0;
-    const canNavigateForward = historyIndex < navigationHistory.length - 1;
+    }, [images.length, currentImageIndex, historyIndex]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Only handle if not typing in input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-                return;
-            }
-            
-            // Undo/Redo
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-                handleUndo();
-                e.preventDefault();
-            }
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-                handleRedo();
-                e.preventDefault();
-            }
-            
-            // Copy/Paste
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedAnnotationId) {
-                copyAnnotation();
-                e.preventDefault();
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedAnnotation) {
-                pasteAnnotation();
-                e.preventDefault();
-            }
-            
-            // Delete key to remove selected annotation(s)
-            if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0))) {
-                if (!Array.isArray(annotations)) return;
-                
-                let idsToDelete = new Set();
-                if (selectedAnnotationId) idsToDelete.add(selectedAnnotationId);
-                if (selectedAnnotationIds && selectedAnnotationIds.forEach) {
-                    selectedAnnotationIds.forEach(id => {
-                        if (id) idsToDelete.add(id);
-                    });
-                }
-                
-                const newAnns = annotations.filter(a => a && a.id && !idsToDelete.has(a.id));
-                saveAnnotations(newAnns);
-                setSelectedAnnotationId(null);
-                setSelectedAnnotationIds(new Set());
-                e.preventDefault();
-            }
-            
-            // Change class with 1-9 keys (works for single or multiple selection)
-            if ((selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0)) && !e.ctrlKey && !e.metaKey) {
-                if (!Array.isArray(annotations) || !Array.isArray(classes)) return;
-                
-                const numKey = parseInt(e.key);
-                if (!isNaN(numKey) && numKey >= 1 && numKey <= 9) {
-                    const classIndex = numKey - 1;
-                    if (classes[classIndex] && classes[classIndex].id !== undefined) {
-                        let idsToChange = new Set();
-                        if (selectedAnnotationId) idsToChange.add(selectedAnnotationId);
-                        if (selectedAnnotationIds && selectedAnnotationIds.forEach) {
-                            selectedAnnotationIds.forEach(id => {
-                                if (id) idsToChange.add(id);
-                            });
-                        }
-                        
-                        const newAnns = annotations.map(a => {
-                            if (!a || !a.id) return a;
-                            return idsToChange.has(a.id) 
-                                ? { ...a, class_id: classes[classIndex].id }
-                                : a;
-                        });
-                        saveAnnotations(newAnns);
-                        e.preventDefault();
-                    }
-                }
-            }
-            
-            // Duplicate annotation (Ctrl+D)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedAnnotationId) {
-                if (!Array.isArray(annotations)) return;
-                
-                const ann = annotations.find(a => a && a.id === selectedAnnotationId);
-                if (ann && typeof ann === 'object' && 
-                    typeof ann.x === 'number' && typeof ann.y === 'number' &&
-                    typeof ann.width === 'number' && typeof ann.height === 'number') {
-                    const newAnn = {
-                        ...ann,
-                        id: uuidv4(),
-                        x: (ann.x || 0) + 10, // Offset slightly
-                        y: (ann.y || 0) + 10
-                    };
-                    const newAnns = [...annotations, newAnn];
-                    saveAnnotations(newAnns);
-                    setSelectedAnnotationId(newAnn.id);
-                    e.preventDefault();
-                }
-            }
-            
-            // Toggle annotations visibility (T key)
-            if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                setShowAnnotations(prev => !prev);
-                e.preventDefault();
-            }
-            
-            // Toggle fullscreen (F11)
-            if (e.key === 'F11') {
-                setIsFullscreen(prev => !prev);
-                e.preventDefault();
-            }
-            
-            // Zoom to selection (Z key)
-            if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.shiftKey && (selectedAnnotationId || (selectedAnnotationIds && selectedAnnotationIds.size > 0))) {
-                // Trigger zoom to selection
-                const event = new CustomEvent('zoomToSelection');
-                window.dispatchEvent(event);
-                e.preventDefault();
-            }
-            
-            // Arrow keys to navigate images
-            if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
-                if (currentImageIndex < images.length - 1) {
-                    changeImageIndex(currentImageIndex + 1);
-                    e.preventDefault();
-                }
-            }
-            if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
-                if (currentImageIndex > 0) {
-                    changeImageIndex(currentImageIndex - 1);
-                    e.preventDefault();
-                }
-            }
-            
-            // Home/End for first/last image
-            if (e.key === 'Home' && !e.ctrlKey && !e.metaKey) {
-                if (images.length > 0) {
-                    changeImageIndex(0);
-                    e.preventDefault();
-                }
-            }
-            if (e.key === 'End' && !e.ctrlKey && !e.metaKey) {
-                if (images.length > 0) {
-                    changeImageIndex(images.length - 1);
-                    e.preventDefault();
-                }
-            }
-            
-            // N for next unannotated image
-            if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                if (Array.isArray(images) && annotatedImages && typeof currentImageIndex === 'number') {
-                    const nextUnannotated = images.findIndex((img, idx) => 
-                        img && idx > currentImageIndex && !annotatedImages.has(img)
-                    );
-                    if (nextUnannotated >= 0) {
-                        changeImageIndex(nextUnannotated);
-                        e.preventDefault();
-                    }
-                }
-            }
-            
-            // Shift+N for previous unannotated
-            if (e.key === 'N' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                if (Array.isArray(images) && annotatedImages && typeof currentImageIndex === 'number' && currentImageIndex > 0) {
-                    const prevUnannotated = images.slice(0, currentImageIndex).reverse().findIndex(img => 
-                        img && !annotatedImages.has(img)
-                    );
-                    if (prevUnannotated >= 0) {
-                        const actualIndex = currentImageIndex - prevUnannotated - 1;
-                        if (actualIndex >= 0 && actualIndex < images.length) {
-                            changeImageIndex(actualIndex);
-                            e.preventDefault();
-                        }
-                    }
-                }
-            }
-            
-            // Select all annotations (Ctrl+A)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
-                if (Array.isArray(annotations) && annotations.length > 0) {
-                    const validIds = annotations
-                        .filter(a => a && a.id)
-                        .map(a => a.id);
-                    if (validIds.length > 0) {
-                        setSelectedAnnotationIds(new Set(validIds));
-                        e.preventDefault();
-                    }
-                }
-            }
-            
-            // Navigation history (Alt+Left/Right)
-            if (e.altKey && e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) {
-                navigateBack();
-                e.preventDefault();
-            }
-            if (e.altKey && e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) {
-                navigateForward();
-                e.preventDefault();
-            }
-            
-            // Show shortcuts help (? or F1)
-            if (e.key === '?' || e.key === 'F1') {
-                setShowShortcuts(prev => !prev);
-                e.preventDefault();
-            }
-            
-            // Toggle Quick Draw Mode (Q)
-            if (e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                setQuickDrawMode(prev => !prev);
-                e.preventDefault();
-            }
-            
-            // Toggle Measurements (M)
-            if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                setShowMeasurements(prev => !prev);
-                e.preventDefault();
-            }
-        };
+    // ========================================================================
+    // Annotation Management Functions
+    // ========================================================================
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedAnnotationId, selectedAnnotationIds, annotations, currentImageIndex, images, saveAnnotations, handleUndo, handleRedo, copyAnnotation, pasteAnnotation, copiedAnnotation, changeImageIndex, navigateBack, navigateForward]);
-
-    // Load annotations when image changes (with caching)
-    useEffect(() => {
-        if (currentImageIndex >= 0 && images[currentImageIndex] && datasetPath) {
-            const imagePath = images[currentImageIndex];
+    /**
+     * Save annotations for the current image
+     * 
+     * @param {Array<Object>} newAnnotations - Array of annotation objects
+     */
+    const saveAnnotations = useCallback(async (newAnnotations) => {
+        if (currentImageIndex < 0 || currentImageIndex >= images.length) return;
             
-            // Check cache first
-            if (annotationCache.current[imagePath]) {
-                setAnnotations(annotationCache.current[imagePath]);
-                return;
-            }
-            
-            const loadAnns = async () => {
-                try {
-                    const res = await api.post('/load_annotation', {
-                        dataset_path: datasetPath,
-                        image_path: imagePath
-                    });
-                    const boxes = res.data.boxes || [];
-                    setAnnotations(boxes);
-                    // Cache annotations
-                    annotationCache.current[imagePath] = boxes;
-                } catch (err) {
-                    console.error("Error loading annotations:", err);
-                    setAnnotations([]);
-                    annotationCache.current[imagePath] = [];
-                }
-            };
-            loadAnns();
-        } else {
-            setAnnotations([]);
-        }
-    }, [currentImageIndex, images, datasetPath]);
-
-    const onChangeAnnotationClass = async (annId, newClassId) => {
-        // Validate inputs
-        if (!annId || typeof newClassId !== 'number' || isNaN(newClassId)) {
-            console.warn('onChangeAnnotationClass: Invalid parameters', annId, newClassId);
-            return;
-        }
+            const currentImagePath = images[currentImageIndex];
+        if (!currentImagePath || !datasetPath) return;
         
-        if (!Array.isArray(annotations)) {
-            console.warn('onChangeAnnotationClass: annotations is not an array');
-            return;
+        setAnnotations(newAnnotations);
+        setSaveStatus('Saving...');
+        
+        try {
+            await api.post('/save_annotation', {
+                image_name: currentImagePath,
+                dataset_path: datasetPath,
+                boxes: newAnnotations
+            });
+            
+            // Update cache
+            annotationCache.current[currentImagePath] = newAnnotations;
+            
+            // Update annotated images set
+            setAnnotatedImages(prev => {
+                const newSet = new Set(prev);
+                if (newAnnotations.length > 0) {
+                    newSet.add(currentImagePath);
+                } else {
+                    newSet.delete(currentImagePath);
+                }
+                return newSet;
+            });
+            
+            setSaveStatus('Saved');
+            
+            // Update undo/redo state
+            setUndoRedoState(newAnnotations);
+        } catch (err) {
+            console.error('Failed to save annotations:', err);
+            setSaveStatus('Error');
         }
+    }, [currentImageIndex, images, datasetPath, setUndoRedoState]);
+
+    /**
+     * Change class of an annotation
+     * 
+     * @param {string} annId - Annotation ID
+     * @param {number} newClassId - New class ID
+     */
+    const onChangeAnnotationClass = useCallback(async (annId, newClassId) => {
+        if (!annId || newClassId === undefined || !Array.isArray(annotations)) return;
         
         const newAnns = annotations.map(a => {
             if (!a || !a.id) return a;
             return a.id === annId ? { ...a, class_id: newClassId } : a;
         });
         
-        setAnnotations(newAnns);
-        // Auto-save
-        setSaveStatus('Saving...');
-        try {
-            if (!Array.isArray(images) || currentImageIndex < 0 || currentImageIndex >= images.length) {
-                console.error('Invalid image index or images array');
-                setSaveStatus('Error');
-                return;
-            }
-            
-            const currentImagePath = images[currentImageIndex];
-            if (!currentImagePath || !datasetPath) {
-                console.error('No image path or dataset path available for saving');
-                setSaveStatus('Error');
-                return;
-            }
-            
-            await api.post('/save_annotation', {
-                image_name: currentImagePath,
-                dataset_path: datasetPath,
-                boxes: newAnns
-            });
-            setTimeout(() => setSaveStatus('Saved'), 500);
-            
-            // Update annotated images set (should already be in set, but ensure it)
-            if (currentImagePath && newAnns.length > 0) {
-                setAnnotatedImages(prev => {
-                    const newSet = new Set(prev);
-                    newSet.add(currentImagePath);
-                    return newSet;
-                });
-            }
-        } catch (err) {
-            console.error('Failed to change annotation class:', err);
-            setSaveStatus('Error');
-        }
-    };
+        await saveAnnotations(newAnns);
+    }, [annotations, saveAnnotations]);
 
-    const onUpdateClasses = async (newClasses) => {
+    /**
+     * Update classes list
+     * 
+     * @param {Array<Object>} newClasses - New classes array
+     */
+    const onUpdateClasses = useCallback(async (newClasses) => {
         setClasses(newClasses);
         try {
             await api.post('/save_classes', { classes: newClasses, dataset_path: datasetPath });
         } catch (err) {
-            console.error(err);
+            console.error('Failed to save classes:', err);
         }
-    };
+    }, [datasetPath]);
 
-    const handleImportYaml = async () => {
+    /**
+     * Handle YAML import
+     * Imports classes from a YAML file (YOLO format)
+     */
+    const handleImportYaml = useCallback(async () => {
         try {
             if (!window.electronAPI || !window.electronAPI.selectFile) {
                 alert("Electron API not available. Please run in Electron.");
@@ -935,193 +581,237 @@ function App() {
             // Create FormData and send to backend
             const formData = new FormData();
             formData.append('file', blob, fileName);
+            formData.append('dataset_path', datasetPath || '');
 
-            const res = await api.post('/import_yaml_classes', formData);
+            const response = await api.post('/import_yaml_classes', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
 
-            if (res.data.classes && res.data.classes.length > 0) {
-                // Ask user if they want to replace or merge
-                const action = window.confirm(
-                    `Found ${res.data.count} classes in YAML file.\n\n` +
-                    `Click OK to replace existing classes, or Cancel to merge.`
-                );
-
-                if (action) {
-                    // Replace
-                    setClasses(res.data.classes);
-                    if (datasetPath) {
-                        await api.post('/save_classes', { 
-                            classes: res.data.classes, 
-                            dataset_path: datasetPath 
-                        });
-                    }
-                    alert(`Imported ${res.data.count} classes from YAML.`);
-                } else {
-                    // Merge - add new classes that don't exist
-                    const existingNames = new Set(classes.map(c => c.name.toLowerCase()));
-                    const newClasses = res.data.classes.filter(c => 
-                        !existingNames.has(c.name.toLowerCase())
-                    );
-                    if (newClasses.length > 0) {
-                        const merged = [...classes, ...newClasses];
-                        setClasses(merged);
-                        if (datasetPath) {
-                            await api.post('/save_classes', { 
-                                classes: merged, 
-                                dataset_path: datasetPath 
-                            });
-                        }
-                        alert(`Added ${newClasses.length} new classes from YAML.`);
-                    } else {
-                        alert('All classes from YAML already exist.');
-                    }
-                }
-            } else {
-                alert('No classes found in YAML file.');
+            if (response.data.classes) {
+                setClasses(response.data.classes);
+                alert(`Successfully imported ${response.data.classes.length} classes from YAML`);
             }
         } catch (err) {
-            console.error(err);
-            let errorMsg = "Failed to import YAML";
-            if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-                errorMsg = "Cannot connect to backend server. Please make sure the application is running correctly.";
-            } else if (err.response?.data?.detail) {
-                errorMsg = err.response.data.detail;
-            } else if (err.message) {
-                errorMsg = err.message;
-            }
-            alert(`Error importing YAML: ${errorMsg}`);
+            console.error('Failed to import YAML:', err);
+            alert('Failed to import YAML: ' + (err.response?.data?.detail || err.message || 'Unknown error'));
         } finally {
             setLoading(false);
         }
-    };
+    }, [datasetPath]);
 
-    const openDataset = async (resetState = false) => {
-        try {
-            if (!window.electronAPI || !window.electronAPI.selectDirectory) {
-                alert("Electron API not available. Please run in Electron.");
+    /**
+     * Handle undo operation
+     */
+    const handleUndo = useCallback(() => {
+        if (canUndo) {
+            const previousState = undo();
+            if (previousState) {
+                setAnnotations(previousState);
+                saveAnnotations(previousState);
+            }
+        }
+    }, [canUndo, undo, saveAnnotations]);
+
+    /**
+     * Handle redo operation
+     */
+    const handleRedo = useCallback(() => {
+        if (canRedo) {
+            const nextState = redo();
+            if (nextState) {
+                setAnnotations(nextState);
+                saveAnnotations(nextState);
+            }
+        }
+    }, [canRedo, redo, saveAnnotations]);
+
+    // ========================================================================
+    // Keyboard Shortcuts Handler
+    // ========================================================================
+
+    /**
+     * Handle keyboard shortcuts
+     * 
+     * @param {KeyboardEvent} e - Keyboard event
+     */
+    const handleKeyDown = useCallback((e) => {
+        // Ignore if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                 return;
             }
             
-            // First, check if backend is available
-            try {
-                await api.get('/', { timeout: 3000 });
-            } catch (err) {
-                if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
-                    const errorMsg = "Backend server is not running!\n\n" +
-                        "The Python backend needs to be started before opening a dataset.\n\n" +
-                        "Possible causes:\n" +
-                        "1. Python is not installed or not in PATH\n" +
-                        "2. Python dependencies are not installed\n" +
-                        "3. The backend failed to start\n\n" +
-                        "Please check the console for detailed error messages.\n" +
-                        "If the error persists, try:\n" +
-                        "- Restart the application\n" +
-                        "- Install Python 3.10+ and add it to PATH\n" +
-                        "- Install dependencies: pip install -r requirements.txt";
-                    alert(errorMsg);
-                    setBackendError("Backend server is not running. Please check the console for details.");
+        // Navigation
+        if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            if (currentImageIndex > 0) {
+                changeImageIndex(currentImageIndex - 1);
+            }
+        } else if (e.key === 'ArrowRight' && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            if (currentImageIndex < images.length - 1) {
+                changeImageIndex(currentImageIndex + 1);
+            }
+        } else if (e.key === 'Home') {
+            e.preventDefault();
+            if (images.length > 0) {
+                changeImageIndex(0);
+            }
+        } else if (e.key === 'End') {
+            e.preventDefault();
+            if (images.length > 0) {
+                changeImageIndex(images.length - 1);
+            }
+        }
+        
+        // Next unannotated image
+        if (e.key === 'n' || e.key === 'N') {
+            e.preventDefault();
+            const direction = e.shiftKey ? -1 : 1;
+            let nextIndex = currentImageIndex;
+            
+            for (let i = 0; i < images.length; i++) {
+                nextIndex = (nextIndex + direction + images.length) % images.length;
+                if (!annotatedImages.has(images[nextIndex])) {
+                    changeImageIndex(nextIndex);
                     return;
                 }
             }
-            
-            const path = await window.electronAPI.selectDirectory();
-            if (path) {
-                // Clear previous state if opening new dataset
-                if (resetState) {
-                    setSelectedAnnotationId(null);
-                    setAnnotations([]);
-                }
-                
-                setDatasetPath(path);
-                setLoading(true);
-                // Load images
-                try {
-                    const res = await api.post('/load_dataset', { path });
-                    setImages(res.data.images);
-                    if (res.data.images.length > 0) {
-                        setCurrentImageIndex(0);
-                    } else {
-                        alert("No images found in the selected directory");
-                    }
-
-                    // Load classes
-                    const clsRes = await api.post('/load_classes', { path });
-                    if (clsRes.data.classes.length > 0) {
-                        setClasses(clsRes.data.classes);
-                        setSelectedClassId(0);
-                    } else {
-                        setClasses([
-                            { id: 0, name: 'default', color: '#00e0ff' }
-                        ]);
-                        setSelectedClassId(0);
-                    }
-                    
-                    // Load annotated images list
-                    try {
-                        const annotatedRes = await api.post('/get_annotated_images', { dataset_path: path });
-                        if (annotatedRes.data.annotated_images) {
-                            setAnnotatedImages(new Set(annotatedRes.data.annotated_images));
-                        }
-                    } catch (err) {
-                        console.error('Failed to load annotated images:', err);
-                        // Continue without annotated images list
-                    }
-                } catch (err) {
-                    console.error(err);
-                    let errorMsg = "Failed to load dataset";
-                    if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-                        errorMsg = "Cannot connect to backend server.\n\n" +
-                            "The backend may have stopped. Please:\n" +
-                            "1. Check the console for error messages\n" +
-                            "2. Restart the application\n" +
-                            "3. Verify Python is installed and dependencies are installed";
-                        setBackendError("Backend connection lost. Please restart the application.");
-                    } else if (err.response?.data?.detail) {
-                        errorMsg = err.response.data.detail;
-                    } else if (err.message) {
-                        errorMsg = err.message;
-                    }
-                    alert(`Error: ${errorMsg}`);
-                } finally {
-                    setLoading(false);
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Failed to open directory dialog");
         }
-    };
+        
+        // History navigation
+        if (e.altKey && e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (canUndo && historyIndex > 0) {
+                const prevIndex = navigationHistory[historyIndex - 1];
+                setHistoryIndex(prev => prev - 1);
+                setCurrentImageIndex(prevIndex);
+            }
+        } else if (e.altKey && e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (historyIndex < navigationHistory.length - 1) {
+                const nextIndex = navigationHistory[historyIndex + 1];
+                setHistoryIndex(prev => prev + 1);
+                setCurrentImageIndex(nextIndex);
+            }
+        }
+        
+        // Toggle annotations
+        if (e.key === 't' || e.key === 'T') {
+            e.preventDefault();
+            setShowAnnotations(prev => !prev);
+        }
+        
+        // Fullscreen
+        if (e.key === 'F11') {
+            e.preventDefault();
+            setIsFullscreen(prev => !prev);
+        }
+        
+        // Shortcuts help
+        if (e.key === '?' || e.key === 'F1') {
+            e.preventDefault();
+            setShowShortcuts(prev => !prev);
+        }
+        
+        // Open Dataset (Ctrl+O)
+        if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+            e.preventDefault();
+            if (window.electronAPI && window.electronAPI.selectFolder) {
+                window.electronAPI.selectFolder().then(folderPath => {
+                    if (folderPath) {
+                        loadDataset(folderPath);
+                    }
+                });
+            }
+        }
+        
+        // Undo/Redo
+        if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            if (canUndo) undo();
+        } else if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+            e.preventDefault();
+            if (canRedo) redo();
+        }
+        
+        // Delete selected annotation
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnotationId) {
+            e.preventDefault();
+            const newAnns = annotations.filter(a => a.id !== selectedAnnotationId);
+            saveAnnotations(newAnns);
+            setSelectedAnnotationId(null);
+        }
+    }, [currentImageIndex, images.length, changeImageIndex, annotatedImages, canUndo, canRedo, undo, redo, historyIndex, navigationHistory, loadDataset, selectedAnnotationId, annotations, saveAnnotations]);
 
-    // ... existing ...
-
-    // Calculate progress
-    const annotatedCount = images.filter((img) => annotatedImages.has(img)).length;
-    const progress = images.length > 0 ? ((annotatedCount / images.length) * 100).toFixed(1) : 0;
-
-    // Debug: Log render
+    // Attach keyboard listener
     useEffect(() => {
-        console.log('App rendered', { 
-            imagesCount: images.length, 
-            currentIndex: currentImageIndex,
-            datasetPath,
-            loading,
-            backendError 
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleKeyDown]);
+
+    // ========================================================================
+    // Load Annotations for Current Image
+    // ========================================================================
+
+    /**
+     * Load annotations for the current image
+     */
+    useEffect(() => {
+        if (currentImageIndex < 0 || currentImageIndex >= images.length || !datasetPath) {
+            setAnnotations([]);
+            return;
+        }
+        
+        const currentImagePath = images[currentImageIndex];
+        if (!currentImagePath) return;
+        
+        // Check cache first
+        if (annotationCache.current[currentImagePath]) {
+            setAnnotations(annotationCache.current[currentImagePath]);
+            return;
+        }
+        
+        // Load from backend
+        setLoading(true);
+        api.post('/load_annotation', {
+            image_path: currentImagePath,
+            dataset_path: datasetPath
+        })
+        .then(res => {
+            const loadedAnnotations = res.data.boxes || [];
+            setAnnotations(loadedAnnotations);
+            annotationCache.current[currentImagePath] = loadedAnnotations;
+            setUndoRedoState(loadedAnnotations);
+        })
+        .catch(err => {
+            console.error('Failed to load annotations:', err);
+            setAnnotations([]);
+        })
+        .finally(() => {
+            setLoading(false);
         });
-    }, [images.length, currentImageIndex, datasetPath, loading, backendError]);
+    }, [currentImageIndex, images, datasetPath, setUndoRedoState]);
+
+    // ========================================================================
+    // Render
+    // ========================================================================
 
     return (
         <>
-        {/* Backend Error Banner */}
+            {/* Backend Error Display */}
         {backendError && (
             <div style={{
                 position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
+                    top: '10px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
                 zIndex: 10000,
-                background: 'rgba(255, 0, 0, 0.9)',
+                    background: 'rgba(255, 68, 68, 0.9)',
                 color: 'white',
-                padding: '15px',
-                textAlign: 'center',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
                 fontSize: '0.9rem',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
             }}>
@@ -1129,6 +819,7 @@ function App() {
             </div>
         )}
         
+            {/* Main Application Container */}
         <div className="app-container" style={{ 
             display: isFullscreen ? 'none' : 'flex', 
             height: '100vh', 
@@ -1144,7 +835,8 @@ function App() {
             left: 0 
         }}>
             {/* Sidebar - Class Manager */}
-            {!isFullscreen && <Sidebar
+                {!isFullscreen && currentLayout.showSidebar && (
+                    <Sidebar
                 classes={classes}
                 setClasses={onUpdateClasses}
                 selectedClassId={selectedClassId}
@@ -1153,157 +845,41 @@ function App() {
                 onChangeAnnotationClass={onChangeAnnotationClass}
                 onImportYaml={handleImportYaml}
                 annotations={annotations}
-                recentClasses={recentClasses}
                 onBatchDeleteClass={(classId) => {
                     const newAnns = annotations.filter(a => a.class_id !== classId);
-                    saveAnnotations(newAnns, true, true); // Immediate save for batch operations
+                            saveAnnotations(newAnns);
                 }}
                 onBatchChangeClass={(oldClassId, newClassId) => {
                     const newAnns = annotations.map(a => 
                         a.class_id === oldClassId ? { ...a, class_id: newClassId } : a
                     );
-                    saveAnnotations(newAnns, true, true);
-                }}
-                onAlignAnnotations={(alignment) => {
-                    if (selectedAnnotationIds.size === 0 && !selectedAnnotationId) return;
-                    
-                    const idsToAlign = selectedAnnotationIds.size > 0 
-                        ? Array.from(selectedAnnotationIds)
-                        : [selectedAnnotationId];
-                    
-                    const annsToAlign = annotations.filter(a => a && idsToAlign.includes(a.id));
-                    if (annsToAlign.length < 2) return;
-                    
-                    let newAnns = [...annotations];
-                    
-                    if (alignment === 'left') {
-                        const minX = Math.min(...annsToAlign.map(a => a.x));
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, x: minX } : a
-                        );
-                    } else if (alignment === 'right') {
-                        const maxX = Math.max(...annsToAlign.map(a => a.x + a.width));
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, x: maxX - a.width } : a
-                        );
-                    } else if (alignment === 'top') {
-                        const minY = Math.min(...annsToAlign.map(a => a.y));
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, y: minY } : a
-                        );
-                    } else if (alignment === 'bottom') {
-                        const maxY = Math.max(...annsToAlign.map(a => a.y + a.height));
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, y: maxY - a.height } : a
-                        );
-                    } else if (alignment === 'center-h') {
-                        const centerX = annsToAlign.reduce((sum, a) => sum + a.x + a.width / 2, 0) / annsToAlign.length;
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, x: centerX - a.width / 2 } : a
-                        );
-                    } else if (alignment === 'center-v') {
-                        const centerY = annsToAlign.reduce((sum, a) => sum + a.y + a.height / 2, 0) / annsToAlign.length;
-                        newAnns = newAnns.map(a => 
-                            idsToAlign.includes(a.id) ? { ...a, y: centerY - a.height / 2 } : a
-                        );
-                    } else if (alignment === 'distribute-h') {
-                        const sorted = [...annsToAlign].sort((a, b) => a.x - b.x);
-                        const totalWidth = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width - sorted[0].x;
-                        const spacing = totalWidth / (sorted.length - 1);
-                        let currentX = sorted[0].x;
-                        sorted.forEach((ann, idx) => {
-                            if (idx > 0 && idx < sorted.length - 1) {
-                                currentX += spacing;
-                                const annIdx = newAnns.findIndex(a => a.id === ann.id);
-                                if (annIdx >= 0) {
-                                    newAnns[annIdx] = { ...newAnns[annIdx], x: currentX - ann.width / 2 };
-                                }
+                            saveAnnotations(newAnns);
+                        }}
+                        onAlignAnnotations={() => {
+                            // TODO: Implement alignment
+                            alert('Alignment feature coming soon!');
+                        }}
+                        onPreAnnotate={async () => {
+                            if (!yoloModelPath) {
+                                alert('Please set YOLO model path first');
+                                return;
                             }
-                        });
-                    } else if (alignment === 'distribute-v') {
-                        const sorted = [...annsToAlign].sort((a, b) => a.y - b.y);
-                        const totalHeight = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height - sorted[0].y;
-                        const spacing = totalHeight / (sorted.length - 1);
-                        let currentY = sorted[0].y;
-                        sorted.forEach((ann, idx) => {
-                            if (idx > 0 && idx < sorted.length - 1) {
-                                currentY += spacing;
-                                const annIdx = newAnns.findIndex(a => a.id === ann.id);
-                                if (annIdx >= 0) {
-                                    newAnns[annIdx] = { ...newAnns[annIdx], y: currentY - ann.height / 2 };
+                            setLoading(true);
+                            try {
+                                const currentImagePath = images[currentImageIndex];
+                                const res = await api.post('/pre_annotate', {
+                                    image_path: currentImagePath,
+                                    model_path: yoloModelPath,
+                                    confidence: yoloConfidence,
+                                    dataset_path: datasetPath
+                                });
+                                if (res.data.boxes) {
+                                    await saveAnnotations(res.data.boxes);
                                 }
-                            }
-                        });
-                    }
-                    
-                    saveAnnotations(newAnns, true, true);
-                }}
-                images={images}
-                datasetPath={datasetPath}
-                onUpdateAnnotations={async (imagePath, newAnnotations) => {
-                    // Update annotations for a specific image
-                    if (!imagePath || !Array.isArray(newAnnotations)) return;
-                    
-                    // Find the image index
-                    const imageIndex = images.findIndex(img => img === imagePath || img.endsWith(imagePath) || imagePath.endsWith(img));
-                    if (imageIndex < 0) return;
-                    
-                    // If it's the current image, update directly
-                    if (imageIndex === currentImageIndex) {
-                        // Add IDs to annotations if missing
-                        const annotationsWithIds = newAnnotations.map(ann => ({
-                            ...ann,
-                            id: ann.id || uuidv4()
-                        }));
-                        await saveAnnotations(annotationsWithIds, true, true);
-                    } else {
-                        // Save annotations for other images via API
-                        try {
-                            await api.post('/save_annotation', {
-                                image_name: imagePath,
-                                dataset_path: datasetPath,
-                                boxes: newAnnotations.map(ann => ({
-                                    ...ann,
-                                    id: ann.id || uuidv4()
-                                }))
-                            });
-                            
-                            // Update cache
-                            if (annotationCache && annotationCache.current) {
-                                annotationCache.current[imagePath] = newAnnotations;
-                            }
-                            
-                            // Update annotated images set
-                            setAnnotatedImages(prev => {
-                                const newSet = new Set(prev);
-                                if (newAnnotations.length > 0) {
-                                    newSet.add(imagePath);
-                                } else {
-                                    newSet.delete(imagePath);
-                                }
-                                return newSet;
-                            });
-                        } catch (err) {
-                            console.error('Failed to update annotations:', err);
-                            alert('Failed to update annotations: ' + (err.message || 'Unknown error'));
-                        }
-                    }
-                }}
-                onOpenVisionLLM={() => setShowVisionLLM(true)}
-                onPreAnnotate={async (modelPath, confidence) => {
-                    if (!datasetPath || images.length === 0) {
-                        alert('Please open a dataset first');
-                        return;
-                    }
-                    try {
-                        setLoading(true);
-                        // This would call a backend endpoint for YOLO pre-annotation
-                        // For now, we'll show a message
-                        alert(`YOLO Pre-annotation feature:\n\nModel: ${modelPath}\nConfidence: ${(confidence * 100).toFixed(0)}%\n\nThis feature requires YOLO model integration in the backend.`);
-                        setLoading(false);
                     } catch (err) {
                         console.error('Pre-annotation failed:', err);
                         alert('Pre-annotation failed: ' + (err.message || 'Unknown error'));
+                            } finally {
                         setLoading(false);
                     }
                 }}
@@ -1311,89 +887,86 @@ function App() {
                 setYoloModelPath={setYoloModelPath}
                 yoloConfidence={yoloConfidence}
                 setYoloConfidence={setYoloConfidence}
+                        recentClasses={recentClasses}
                 quickDrawMode={quickDrawMode}
-                onToggleQuickDraw={() => setQuickDrawMode(prev => !prev)}
+                        onToggleQuickDraw={() => setQuickDrawMode(!quickDrawMode)}
                 showMeasurements={showMeasurements}
-                onToggleMeasurements={() => setShowMeasurements(prev => !prev)}
+                        onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
                 annotationTemplates={annotationTemplates}
-                onSaveTemplate={(name) => {
-                    const template = {
-                        id: Date.now(),
-                        name,
-                        annotations: [...annotations],
-                        classes: [...classes],
-                        timestamp: new Date().toISOString()
-                    };
+                        onSaveTemplate={(template) => {
                     setAnnotationTemplates(prev => [...prev, template]);
                 }}
                 onLoadTemplate={(template) => {
-                    if (template.annotations && Array.isArray(template.annotations)) {
-                        saveAnnotations(template.annotations, true, true);
-                    }
+                            // Apply template to current annotations
+                            alert('Template loading feature coming soon!');
                 }}
                 onDeleteTemplate={(templateId) => {
                     setAnnotationTemplates(prev => prev.filter(t => t.id !== templateId));
                 }}
-            />}
-
-            {/* Right Side Panels - Stats, Analytics, and Validation */}
-            {datasetPath && (
-                <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    width: '250px',
-                    margin: '10px',
-                    gap: '10px',
-                    maxHeight: '100vh',
-                    overflowY: 'auto'
-                }}>
-                    {/* Stats Panel */}
-                    <StatsPanel 
-                        images={images} 
-                        annotations={annotations} 
-                        classes={classes} 
-                        datasetPath={datasetPath} 
-                        annotatedImages={annotatedImages} 
+                        onOpenVisionLLM={() => setShowVisionLLM(true)}
                     />
-                    
-                    {/* Analytics Panel */}
-                    <AnalyticsPanel
-                        images={images}
-                        annotations={annotations}
-                        classes={classes}
-                        annotatedImages={annotatedImages}
-                    />
-                    
-                    {/* Validation Panel */}
-                    {currentImageIndex >= 0 && images[currentImageIndex] && (
-                        <ValidationPanel
-                            annotations={annotations}
-                            currentImagePath={images[currentImageIndex]}
-                            datasetPath={datasetPath}
-                            onFixAnnotation={(annId) => {
-                                const newAnns = annotations.filter(a => a.id !== annId);
-                                saveAnnotations(newAnns);
-                            }}
-                        />
-                    )}
-                    
-                    {/* Measurements Panel */}
-                    {showMeasurements && (
-                        <MeasurementsPanel
-                            annotations={annotations}
-                            classes={classes}
-                            imageDimensions={{ width: 0, height: 0 }} // TODO: Get from canvas
-                            selectedId={selectedAnnotationId}
-                            selectedIds={selectedAnnotationIds}
-                        />
-                    )}
-                </div>
             )}
 
             {/* Main Canvas Area */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                {/* Top Bar */}
-                <div className="glass-panel title-drag-region" style={{ minHeight: '60px', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', margin: '10px', flexDirection: 'column', zIndex: 1000, position: 'relative', boxSizing: 'border-box', marginTop: '10px', marginBottom: '10px' }}>
+                {/* Welcome Screen when no dataset is loaded */}
+                {!datasetPath && (
+                    <div style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '40px',
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, rgba(0, 224, 255, 0.05) 0%, rgba(86, 176, 255, 0.05) 100%)'
+                    }}>
+                        <h1 className="neon-text" style={{ fontSize: '2.5rem', marginBottom: '20px', fontWeight: 'bold' }}>
+                            Lama Worlds Annotation Studio
+                        </h1>
+                        <p style={{ fontSize: '1.2rem', color: '#aaa', marginBottom: '40px', maxWidth: '600px' }}>
+                            Bienvenue ! Ouvrez un dataset pour commencer à annoter vos images.
+                        </p>
+                        <button
+                            className="btn-primary"
+                            onClick={handleOpenDataset}
+                            style={{
+                                padding: '15px 30px',
+                                fontSize: '1.1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <FolderOpen size={24} />
+                            Ouvrir un Dataset
+                        </button>
+                        <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '30px' }}>
+                            Raccourci clavier : <kbd style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>Ctrl+O</kbd>
+                        </p>
+                    </div>
+                )}
+                
+                {/* Main Content when dataset is loaded */}
+                {datasetPath && (
+                    <>
+                    {/* Top Bar with Controls */}
+                    <div className="glass-panel title-drag-region" style={{ 
+                        minHeight: '60px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        padding: '0 20px', 
+                        justifyContent: 'space-between', 
+                        margin: '10px', 
+                        flexDirection: 'column', 
+                        zIndex: 1000, 
+                        position: 'relative', 
+                        boxSizing: 'border-box', 
+                        marginTop: '10px', 
+                        marginBottom: '10px' 
+                    }}>
+                        {/* Error Display */}
                     {backendError && (
                         <div style={{ 
                             width: '100%', 
@@ -1421,9 +994,94 @@ function App() {
                             </div>
                         </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>LAMA ANNOTATION STUDIO</div>
+                        
+                        {/* Top Bar Controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                                <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                                    LAMA ANNOTATION STUDIO
+                                </div>
+                                
+                                {/* Open Dataset Button */}
+                                <button
+                                    onClick={async () => {
+                                        if (!window.electronAPI || !window.electronAPI.selectFolder) {
+                                            alert("Electron API not available. Please run in Electron.");
+                                            return;
+                                        }
+                                        const folderPath = await window.electronAPI.selectFolder();
+                                        if (folderPath) {
+                                            await loadDataset(folderPath);
+                                        }
+                                    }}
+                                    style={{
+                                        background: 'rgba(0, 224, 255, 0.15)',
+                                        border: '1px solid rgba(0, 224, 255, 0.4)',
+                                        borderRadius: '6px',
+                                        padding: '6px 12px',
+                                        color: '#00e0ff',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 2px 8px rgba(0, 224, 255, 0.1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = 'rgba(0, 224, 255, 0.25)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(0, 224, 255, 0.2)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = 'rgba(0, 224, 255, 0.15)';
+                                        e.target.style.boxShadow = '0 2px 8px rgba(0, 224, 255, 0.1)';
+                                    }}
+                                    title="Open Dataset Folder (Ctrl+O)"
+                                >
+                                    <FolderOpen size={16} />
+                                    Open Dataset
+                                </button>
+                                
+                                {/* Layout Manager */}
+                                <LayoutManager
+                                    currentLayout={currentLayout}
+                                    onLayoutChange={(layout) => {
+                                        setCurrentLayout(layout);
+                                        if (layout.showStatsPanels !== undefined) {
+                                            setShowStatsPanels(layout.showStatsPanels);
+                                        }
+                                    }}
+                                    showStatsPanels={showStatsPanels}
+                                    onToggleStatsPanels={() => setShowStatsPanels(!showStatsPanels)}
+                                    onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+                                />
+                                
+                                {/* Workflow Mode */}
+                                <WorkflowMode
+                                    currentMode={workflowMode}
+                                    onModeChange={setWorkflowMode}
+                                    onToggleQuickDraw={() => setQuickDrawMode(!quickDrawMode)}
+                                    onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
+                                />
+                                
+                                {/* Advanced Search */}
+                                <AdvancedSearch
+                                    onSearch={(filters) => {
+                                        setAdvancedFilters(filters);
+                                    }}
+                                    filters={advancedFilters}
+                                    imageTags={imageTags}
+                                    classes={classes}
+                                />
+                                
+                                {/* Theme Manager */}
+                                <ThemeManager
+                                    currentTheme={currentTheme}
+                                    onThemeChange={setCurrentTheme}
+                                />
+                                
+                                {/* Help Button */}
                             <button
                                 onClick={() => setShowShortcuts(true)}
                                 style={{
@@ -1442,6 +1100,8 @@ function App() {
                             >
                                 <span>?</span> Help
                             </button>
+                                
+                                {/* Settings Button */}
                             <button
                                 onClick={() => setShowSettings(true)}
                                 style={{
@@ -1461,9 +1121,19 @@ function App() {
                                 <Settings size={14} />
                                 Settings
                             </button>
-                            <div style={{ fontSize: '0.8rem', color: saveStatus === 'Error' ? '#ff4444' : '#00ff00', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+                                
+                                {/* Save Status */}
+                                <div style={{ 
+                                    fontSize: '0.8rem', 
+                                    color: saveStatus === 'Error' ? '#ff4444' : '#00ff00', 
+                                    border: '1px solid rgba(255,255,255,0.1)', 
+                                    padding: '2px 8px', 
+                                    borderRadius: '4px' 
+                                }}>
                                 {saveStatus}
                             </div>
+                                
+                                {/* Undo/Redo Controls */}
                             <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#aaa', alignItems: 'center' }}>
                                 {(canUndo || canRedo) && (
                                     <>
@@ -1471,130 +1141,53 @@ function App() {
                                             onClick={handleUndo}
                                             disabled={!canUndo}
                                             style={{
-                                                padding: '2px 8px',
+                                                    padding: '4px 8px',
                                                 background: canUndo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                    border: '1px solid rgba(0, 224, 255, 0.3)',
                                                 borderRadius: '4px',
                                                 color: canUndo ? '#00e0ff' : '#666',
                                                 cursor: canUndo ? 'pointer' : 'not-allowed',
                                                 fontSize: '0.75rem'
                                             }}
+                                                title="Undo (Ctrl+Z)"
                                         >
-                                            Undo (Ctrl+Z)
+                                                ↶ Undo
                                         </button>
                                         <button
                                             onClick={handleRedo}
                                             disabled={!canRedo}
                                             style={{
-                                                padding: '2px 8px',
+                                                    padding: '4px 8px',
                                                 background: canRedo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                    border: '1px solid rgba(0, 224, 255, 0.3)',
                                                 borderRadius: '4px',
                                                 color: canRedo ? '#00e0ff' : '#666',
                                                 cursor: canRedo ? 'pointer' : 'not-allowed',
                                                 fontSize: '0.75rem'
                                             }}
-                                        >
-                                            Redo (Ctrl+Y)
-                                        </button>
-                                    </>
-                                )}
-                                {/* Navigation history */}
-                                {(canNavigateBack || canNavigateForward) && (
-                                    <>
-                                        <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.2)' }} />
-                                        <button
-                                            onClick={navigateBack}
-                                            disabled={!canNavigateBack}
-                                            style={{
-                                                padding: '2px 8px',
-                                                background: canNavigateBack ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                borderRadius: '4px',
-                                                color: canNavigateBack ? '#00e0ff' : '#666',
-                                                cursor: canNavigateBack ? 'pointer' : 'not-allowed',
-                                                fontSize: '0.75rem'
-                                            }}
-                                            title="Alt+Left"
-                                        >
-                                            ← Back
-                                        </button>
-                                        <button
-                                            onClick={navigateForward}
-                                            disabled={!canNavigateForward}
-                                            style={{
-                                                padding: '2px 8px',
-                                                background: canNavigateForward ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                borderRadius: '4px',
-                                                color: canNavigateForward ? '#00e0ff' : '#666',
-                                                cursor: canNavigateForward ? 'pointer' : 'not-allowed',
-                                                fontSize: '0.75rem'
-                                            }}
-                                            title="Alt+Right"
-                                        >
-                                            Forward →
-                                        </button>
-                                    </>
-                                )}
-                                {/* Next unannotated */}
-                                {images.length > 0 && (
-                                    <>
-                                        <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.2)' }} />
-                                        <button
-                                            onClick={() => {
-                                                const nextUnannotated = images.findIndex((img, idx) => 
-                                                    idx > currentImageIndex && !annotatedImages.has(img)
-                                                );
-                                                if (nextUnannotated >= 0) {
-                                                    changeImageIndex(nextUnannotated);
-                                                }
-                                            }}
-                                            style={{
-                                                padding: '2px 8px',
-                                                background: 'rgba(0, 224, 255, 0.1)',
-                                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                                borderRadius: '4px',
-                                                color: '#00e0ff',
-                                                cursor: 'pointer',
-                                                fontSize: '0.75rem'
-                                            }}
-                                            title="Next Unannotated (N)"
-                                        >
-                                            Next Empty (N)
+                                                title="Redo (Ctrl+Y)"
+                                            >
+                                                ↷ Redo
                                         </button>
                                     </>
                                 )}
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            {!datasetPath && (
-                                <button className="btn-primary" onClick={() => openDataset(true)}>
-                                    Open Dataset Folder
-                                </button>
-                            )}
+                            
+                            {/* Dataset Path Display */}
                             {datasetPath && (
-                                <>
-                                    <span style={{ color: '#aaa', fontSize: '0.8rem', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontSize: '0.75rem', color: '#666', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {datasetPath}
-                                    </span>
-                                    <button 
-                                        className="btn-primary" 
-                                        onClick={() => openDataset(true)}
-                                        style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                                    >
-                                        Open Another Dataset
-                                    </button>
-                                </>
+                                </div>
                             )}
                         </div>
-                    </div>
+                        
                     {/* Progress Bar */}
                     {datasetPath && images.length > 0 && (
                         <div style={{ width: '100%', marginTop: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginBottom: '4px' }}>
                                 <span>Progress: {currentImageIndex + 1} / {images.length}</span>
-                                <span>{progress}%</span>
+                                    <span>{Math.round(((currentImageIndex + 1) / images.length) * 100)}%</span>
                             </div>
                             <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                                 <div style={{ 
@@ -1608,24 +1201,8 @@ function App() {
                     )}
                 </div>
 
-                {/* Canvas */}
-                <div style={{ flex: 1, backgroundColor: '#000', margin: '0 10px 10px 10px', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
-                    {loading ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#00e0ff' }}>
-                            <div style={{ 
-                                width: '40px', 
-                                height: '40px', 
-                                border: '3px solid rgba(0, 224, 255, 0.3)', 
-                                borderTop: '3px solid #00e0ff', 
-                                borderRadius: '50%', 
-                                animation: 'spin 1s linear infinite',
-                                marginBottom: '20px'
-                            }}></div>
-                            <div>Loading...</div>
-                        </div>
-                    ) : images.length > 0 ? (
-                        // Ensure currentImageIndex is valid
-                        (currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex]) ? (
+                    {/* Canvas Area */}
+                    {currentImageIndex >= 0 && images[currentImageIndex] && (
                             <AnnotationCanvas
                                 imageUrl={images[currentImageIndex]}
                                 annotations={annotations}
@@ -1640,47 +1217,19 @@ function App() {
                                 onZoomToSelection={selectedAnnotationId || selectedAnnotationIds.size > 0}
                                 isFullscreen={isFullscreen}
                                 onToggleFullscreen={() => setIsFullscreen(prev => !prev)}
-                                quickDrawMode={quickDrawMode}
-                                showMeasurements={showMeasurements}
-                            />
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#00e0ff', gap: '20px' }}>
-                                <div style={{ fontSize: '3rem' }}>🖼️</div>
-                                <div style={{ fontSize: '1.2rem' }}>No image selected</div>
-                                <button 
-                                    className="btn-primary"
-                                    onClick={() => {
-                                        if (images.length > 0) {
-                                            setCurrentImageIndex(0);
-                                        }
-                                    }}
-                                    style={{ padding: '8px 16px', marginTop: '10px' }}
-                                >
-                                    Load First Image
-                                </button>
-                            </div>
-                        )
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#555', gap: '20px' }}>
-                            <div style={{ fontSize: '3rem' }}>📁</div>
-                            <div style={{ fontSize: '1.2rem' }}>No images loaded</div>
-                            <div style={{ fontSize: '0.9rem', color: '#666' }}>Click "Open Dataset Folder" to get started</div>
-                        </div>
+                        />
                     )}
-                </div>
+                    </>
+                )}
             </div>
 
-            {/* Right Panel - Image List & Info */}
+                {/* Right Panel - Image List & Export */}
+                {!isFullscreen && currentLayout.showRightPanel && (
             <RightPanel
-                annotatedImages={annotatedImages}
                 images={images}
                 currentIndex={currentImageIndex}
                 setIndex={changeImageIndex}
                 annotations={annotations}
-                classes={classes}
-                selectedAnnotationId={selectedAnnotationId}
-                onSelectAnnotation={setSelectedAnnotationId}
-                onChangeAnnotationClass={onChangeAnnotationClass}
                 onDeleteAnnotation={(id) => {
                     const newAnns = annotations.filter(a => a.id !== id);
                     saveAnnotations(newAnns);
@@ -1688,13 +1237,42 @@ function App() {
                         setSelectedAnnotationId(null);
                     }
                 }}
+                        classes={classes}
+                        datasetPath={datasetPath}
+                        selectedAnnotationId={selectedAnnotationId}
+                        onSelectAnnotation={setSelectedAnnotationId}
+                        onChangeAnnotationClass={onChangeAnnotationClass}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        filterAnnotated={filterAnnotated}
+                        setFilterAnnotated={setFilterAnnotated}
+                        annotatedImages={annotatedImages}
+                        filterClassId={filterClassId}
+                        setFilterClassId={setFilterClassId}
+                        annotationCache={annotationCache}
+                        onDeleteImage={async (imagePath, index) => {
+                            try {
+                                await api.post('/delete_image', {
+                                    dataset_path: datasetPath,
+                                    image_path: imagePath
+                                });
+                                const newImages = images.filter(img => img !== imagePath);
+                                setImages(newImages);
+                                if (currentImageIndex >= newImages.length) {
+                                    setCurrentImageIndex(Math.max(0, newImages.length - 1));
+                                }
+                            } catch (err) {
+                                console.error('Failed to delete image:', err);
+                                alert('Failed to delete image: ' + (err.message || 'Unknown error'));
+                            }
+                        }}
+                        setImages={setImages}
                 annotationComments={annotationComments}
                 onUpdateAnnotationComment={(annId, comment) => {
                     setAnnotationComments(prev => ({
                         ...prev,
                         [annId]: comment || undefined
                     }));
-                    // Save to localStorage
                     try {
                         const key = `annotation_comments_${datasetPath}`;
                         const updated = { ...annotationComments, [annId]: comment || undefined };
@@ -1710,7 +1288,6 @@ function App() {
                         ...prev,
                         [imagePath]: tags
                     }));
-                    // Save to localStorage
                     try {
                         const key = `image_tags_${datasetPath}`;
                         const updated = { ...imageTags, [imagePath]: tags };
@@ -1722,254 +1299,51 @@ function App() {
                 }}
                 searchInAnnotations={searchInAnnotations}
                 setSearchInAnnotations={setSearchInAnnotations}
-                datasetPath={datasetPath}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                filterAnnotated={filterAnnotated}
-                setFilterAnnotated={setFilterAnnotated}
-                filterClassId={filterClassId}
-                setFilterClassId={setFilterClassId}
-                annotationCache={annotationCache}
-                onDeleteImage={async (imagePath, imageIndex) => {
-                    try {
-                        setLoading(true);
-                        // Delete image and annotation file via backend
-                        await api.post('/delete_image', {
-                            dataset_path: datasetPath,
-                            image_path: imagePath
-                        });
-                        
-                        // Remove from images list
-                        const newImages = images.filter((img, idx) => img !== imagePath);
-                        setImages(newImages);
-                        
-                        // Remove from annotated images set
-                        setAnnotatedImages(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(imagePath);
-                            return newSet;
-                        });
-                        
-                        // Remove from cache
-                        if (annotationCache.current[imagePath]) {
-                            delete annotationCache.current[imagePath];
-                        }
-                        
-                        // Adjust current index if needed
-                        if (imageIndex <= currentImageIndex) {
-                            if (currentImageIndex > 0) {
-                                setCurrentImageIndex(currentImageIndex - 1);
-                            } else if (newImages.length > 0) {
-                                setCurrentImageIndex(0);
-                            } else {
-                                setCurrentImageIndex(-1);
-                            }
-                        } else if (currentImageIndex >= newImages.length && newImages.length > 0) {
-                            setCurrentImageIndex(newImages.length - 1);
-                        }
-                        
-                        // Clear annotations if current image was deleted
-                        if (imageIndex === currentImageIndex) {
-                            setAnnotations([]);
-                        }
-                    } catch (err) {
-                        console.error('Failed to delete image:', err);
-                        throw err;
-                    } finally {
-                        setLoading(false);
-                    }
-                }}
-                setImages={setImages}
                 onExport={async (format) => {
-                    if (format === 'preview') {
-                        setShowExportPreview(true);
-                        return;
-                    }
                     if (!datasetPath) {
                         alert('Please open a dataset first');
                         return;
                     }
                     
-                    // Check if multi-format export is enabled
-                    const exportMultiple = getSetting('exportMultipleFormats', false);
-                    const exportFormats = getSetting('exportFormats', ['yolo']);
-                    const exportWithFilters = getSetting('exportWithFilters', false);
-                    
-                    // Export/Import project
-                    if (format === 'project') {
-                        try {
                             setLoading(true);
-                            const projectData = {
-                                version: '1.0',
-                                datasetPath,
-                                classes,
-                                imageTags,
-                                annotationComments,
-                                currentImageIndex,
-                                selectedClassId,
-                                timestamp: Date.now(),
-                                imageCount: images.length
-                            };
-                            
-                            const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `project_${datasetPath.split(/[/\\]/).pop()}_${new Date().toISOString().split('T')[0]}.json`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                            setLoading(false);
-                            return;
-                        } catch (err) {
-                            console.error('Failed to export project:', err);
-                            alert('Failed to export project: ' + (err.message || 'Unknown error'));
-                            setLoading(false);
-                            return;
-                        }
-                    }
-                    
-                    if (format === 'import_project') {
-                        try {
-                            if (!window.electronAPI || !window.electronAPI.selectFile) {
-                                alert("Electron API not available");
+                    try {
+                        if (format === 'preview') {
+                            setShowExportPreview(true);
+                        } else if (format === 'coco') {
+                            const res = await api.post('/export', { dataset_path: datasetPath, format: 'coco' });
+                            alert(`COCO export completed!\n\nFile: ${res.data.file || res.data.output_path}`);
+                        } else if (format === 'voc') {
+                            const res = await api.post('/export', { dataset_path: datasetPath, format: 'voc' });
+                            alert(`Pascal VOC export completed!\n\nDirectory: ${res.data.dir || res.data.output_path}`);
+                        } else if (format === 'report') {
+                            const res = await api.post('/export_report', { dataset_path: datasetPath });
+                            alert(`Report export completed!\n\nFile: ${res.data.output_path || res.data.file}`);
+                        } else if (format === 'project') {
+                            if (!window.electronAPI || !window.electronAPI.selectFolder) {
+                                alert("Electron API not available. Please run in Electron.");
                                 return;
                             }
+                            const folderPath = await window.electronAPI.selectFolder();
+                            if (!folderPath) return;
                             
-                            const filePath = await window.electronAPI.selectFile([
-                                { name: 'JSON Files', extensions: ['json'] },
-                                { name: 'All Files', extensions: ['*'] }
-                            ]);
-                            
-                            if (!filePath) return;
-                            
-                            setLoading(true);
-                            const fileContent = await window.electronAPI.readFile(filePath);
-                            const projectData = JSON.parse(fileContent);
-                            
-                            if (projectData.version && projectData.datasetPath) {
-                                const confirmMsg = `Import project from:\n${projectData.datasetPath}\n\n` +
-                                    `Classes: ${projectData.classes?.length || 0}\n` +
-                                    `Images: ${projectData.imageCount || 0}\n\n` +
-                                    `This will restore the project state. Continue?`;
-                                
-                                if (window.confirm(confirmMsg)) {
-                                    // Restore project state
-                                    if (projectData.classes) setClasses(projectData.classes);
-                                    if (projectData.imageTags) setImageTags(projectData.imageTags);
-                                    if (projectData.annotationComments) setAnnotationComments(projectData.annotationComments);
-                                    if (projectData.selectedClassId !== undefined) setSelectedClassId(projectData.selectedClassId);
-                                    
-                                    // Try to load dataset if path exists
-                                    try {
-                                        const res = await api.post('/load_dataset', { path: projectData.datasetPath });
-                                        if (res.data.images && res.data.images.length > 0) {
-                                            setDatasetPath(projectData.datasetPath);
-                                            setImages(res.data.images);
-                                            if (projectData.currentImageIndex !== undefined) {
-                                                setCurrentImageIndex(Math.min(projectData.currentImageIndex, res.data.images.length - 1));
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.error('Failed to load dataset:', err);
-                                        alert('Project imported but dataset path not found. Please open the dataset manually.');
-                                    }
-                                }
-                            } else {
-                                alert('Invalid project file format');
-                            }
-                            setLoading(false);
-                            return;
-                        } catch (err) {
-                            console.error('Failed to import project:', err);
-                            alert('Failed to import project: ' + (err.message || 'Unknown error'));
-                            setLoading(false);
-                            return;
-                        }
-                    }
-                    
-                    // Validation before export (except for reports)
-                    if (format !== 'report') {
-                        const invalidAnnotations = annotations.filter(ann => 
-                            ann.width <= 0 || ann.height <= 0 || 
-                            ann.x < 0 || ann.y < 0
-                        );
-                        if (invalidAnnotations.length > 0) {
-                            const proceed = window.confirm(
-                                `Found ${invalidAnnotations.length} invalid annotation(s). Continue anyway?`
-                            );
-                            if (!proceed) return;
-                        }
-                    }
-                    
-                    try {
-                        setLoading(true);
-                        if (format === 'report') {
-                            const res = await api.post('/export_report', {
-                                dataset_path: datasetPath
+                            const res = await api.post('/export_project', {
+                                dataset_path: datasetPath,
+                                output_path: folderPath
                             });
-                            const report = res.data.report;
-                            const summary = report.summary;
-                            const reportText = `Quality Report Generated!\n\n` +
-                                `Dataset: ${datasetPath}\n` +
-                                `Generated: ${new Date(report.generated_at).toLocaleString()}\n\n` +
-                                `Summary:\n` +
-                                `- Total Images: ${summary.total_images}\n` +
-                                `- Annotated: ${summary.annotated_images} (${summary.completion_percentage.toFixed(1)}%)\n` +
-                                `- Total Annotations: ${summary.total_annotations}\n` +
-                                `- Invalid: ${summary.invalid_annotations}\n` +
-                                `- Avg per Image: ${summary.avg_annotations_per_image.toFixed(1)}\n\n` +
-                                `Report saved to: ${res.data.file}`;
-                            alert(reportText);
-                        } else {
-                            // Handle multi-format export
-                            const formatsToExport = exportMultiple && exportFormats.length > 0 
-                                ? exportFormats 
-                                : [format];
-                            
-                            const exportResults = [];
-                            
-                            for (const exportFormat of formatsToExport) {
-                                try {
-                                    const res = await api.post('/export', {
-                                        dataset_path: datasetPath,
-                                        format: exportFormat,
-                                        apply_filters: exportWithFilters,
-                                        filter_class_id: exportWithFilters ? filterClassId : null,
-                                        filter_annotated: exportWithFilters ? filterAnnotated : null
-                                    });
-                                    
-                                    exportResults.push({
-                                        format: exportFormat,
-                                        success: true,
-                                        file: res.data.file,
-                                        dir: res.data.dir,
-                                        count: res.data.count
-                                    });
-                                } catch (err) {
-                                    console.error(`Failed to export ${exportFormat}:`, err);
-                                    exportResults.push({
-                                        format: exportFormat,
-                                        success: false,
-                                        error: err.response?.data?.detail || err.message || "Export failed"
-                                    });
-                                }
+                            alert(`Project export completed!\n\nDirectory: ${res.data.output_path}`);
+                        } else if (format === 'import_project') {
+                            if (!window.electronAPI || !window.electronAPI.selectFolder) {
+                                alert("Electron API not available. Please run in Electron.");
+                                return;
                             }
+                            const folderPath = await window.electronAPI.selectFolder();
+                            if (!folderPath) return;
                             
-                            // Show results
-                            const successCount = exportResults.filter(r => r.success).length;
-                            if (successCount === exportResults.length) {
-                                const message = exportResults.length === 1
-                                    ? (exportResults[0].file 
-                                        ? `Exported to: ${exportResults[0].file}`
-                                        : `Exported ${exportResults[0].count} files to: ${exportResults[0].dir}`)
-                                    : `Successfully exported ${successCount} format(s)`;
-                                alert(message);
-                            } else {
-                                const failed = exportResults.filter(r => !r.success);
-                                alert(`Export completed with errors:\n\n` +
-                                    `Success: ${successCount}/${exportResults.length}\n` +
-                                    `Failed: ${failed.map(f => `${f.format}: ${f.error}`).join('\n')}`);
-                            }
+                            const res = await api.post('/import_project', {
+                                project_path: folderPath
+                            });
+                            await loadDataset(res.data.dataset_path);
+                            alert(`Project imported successfully!\n\nDataset: ${res.data.dataset_path}`);
                         }
                     } catch (err) {
                         console.error(err);
@@ -1979,23 +1353,108 @@ function App() {
                         setLoading(false);
                     }
                 }}
-            />
-            
-            {/* Keyboard Shortcuts Help */}
-            {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
-            
-            {/* Settings Panel */}
-            {showSettings && (
-                <SettingsPanel
-                    settings={settings}
-                    updateSetting={updateSetting}
-                    updateSettings={updateSettings}
-                    resetSettings={() => {
-                        const defaultSettings = loadSettings();
-                        updateSettings(defaultSettings);
-                    }}
-                    onClose={() => setShowSettings(false)}
-                />
+                        onOpenDatasetMerge={() => setShowDatasetMerge(true)}
+                        selectedImages={selectedImages}
+                        onToggleImageSelection={(imagePath) => {
+                            setSelectedImages(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(imagePath)) {
+                                    newSet.delete(imagePath);
+                                } else {
+                                    newSet.add(imagePath);
+                                }
+                                return newSet;
+                            });
+                        }}
+                        onImagePreview={setImagePreview}
+                    />
+                )}
+                
+                {/* Right Side Panels - Stats, Analytics, and Validation */}
+                {datasetPath && showStatsPanels && (
+                    <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        width: currentLayout.showStatsPanels ? '250px' : '40px',
+                        margin: '10px',
+                        gap: '10px',
+                        maxHeight: '100vh',
+                        overflowY: 'auto',
+                        transition: 'width 0.3s ease',
+                        position: 'relative'
+                    }}>
+                        {/* Toggle Button for Stats Panels */}
+                        <button
+                            onClick={() => setShowStatsPanels(!showStatsPanels)}
+                            style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: showStatsPanels ? '0' : '-50px',
+                                zIndex: 100,
+                                padding: '6px 10px',
+                                background: 'rgba(0, 224, 255, 0.1)',
+                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                borderRadius: '6px',
+                                color: '#00e0ff',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.3s ease',
+                                whiteSpace: 'nowrap'
+                            }}
+                            title={showStatsPanels ? 'Hide Statistics Panels' : 'Show Statistics Panels'}
+                        >
+                            {showStatsPanels ? <EyeOff size={14} /> : <Eye size={14} />}
+                            {showStatsPanels && <span>Hide Stats</span>}
+                        </button>
+                        
+                        {showStatsPanels && (
+                            <>
+                                {/* Stats Panel */}
+                                <StatsPanel 
+                                    images={images} 
+                                    annotations={annotations} 
+                                    classes={classes} 
+                                    datasetPath={datasetPath} 
+                                    annotatedImages={annotatedImages} 
+                                />
+                                
+                                {/* Analytics Panel */}
+                                <AnalyticsPanel
+                                    images={images}
+                                    annotations={annotations}
+                                    classes={classes}
+                                    annotatedImages={annotatedImages}
+                                />
+                                
+                                {/* Validation Panel */}
+                                {currentImageIndex >= 0 && images[currentImageIndex] && (
+                                    <ValidationPanel
+                                        annotations={annotations}
+                                        currentImagePath={images[currentImageIndex]}
+                                        datasetPath={datasetPath}
+                                        onFixAnnotation={(annId) => {
+                                            const newAnns = annotations.filter(a => a.id !== annId);
+                                            saveAnnotations(newAnns);
+                                        }}
+                                    />
+                                )}
+                                
+                                {/* Measurements Panel */}
+                                {showMeasurements && (
+                                    <MeasurementsPanel
+                                        annotations={annotations}
+                                        classes={classes}
+                                        imageDimensions={{ width: 0, height: 0 }}
+                                        selectedId={selectedAnnotationId}
+                                        selectedIds={selectedAnnotationIds}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </div>
             )}
         </div>
         
@@ -2031,7 +1490,34 @@ function App() {
             </div>
         )}
         
-        {/* Vision LLM Modal */}
+            {/* Modals */}
+            {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+            
+            {showSettings && (
+                <SettingsPanel
+                    settings={settings}
+                    updateSetting={updateSetting}
+                    updateSettings={updateSettings}
+                    resetSettings={() => {
+                        const defaultSettings = loadSettings();
+                        updateSettings(defaultSettings);
+                    }}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
+            
+            <DatasetMergeModal
+                isOpen={showDatasetMerge}
+                onClose={() => setShowDatasetMerge(false)}
+                onMergeComplete={(result) => {
+                    alert(`Datasets merged successfully!\n\n` +
+                        `Total images: ${result.total_images}\n` +
+                        `Total annotations: ${result.total_annotations}\n` +
+                        `Total classes: ${result.total_classes}\n\n` +
+                        `Output: ${result.output_path}`);
+                }}
+            />
+            
         {showVisionLLM && (
             <VisionLLMModal
                 isOpen={showVisionLLM}
@@ -2042,23 +1528,14 @@ function App() {
                 datasetPath={datasetPath}
                 annotatedImages={annotatedImages}
                 onUpdateAnnotations={async (imagePath, newAnnotations) => {
-                    // Update annotations for a specific image
                     if (!imagePath || !Array.isArray(newAnnotations)) return;
                     
-                    // Find the image index
                     const imageIndex = images.findIndex(img => img === imagePath || img.endsWith(imagePath) || imagePath.endsWith(img));
                     if (imageIndex < 0) return;
                     
-                    // If it's the current image, update directly
                     if (imageIndex === currentImageIndex) {
-                        // Add IDs to annotations if missing
-                        const annotationsWithIds = newAnnotations.map(ann => ({
-                            ...ann,
-                            id: ann.id || uuidv4()
-                        }));
-                        await saveAnnotations(annotationsWithIds, true, true);
+                            await saveAnnotations(newAnnotations);
                     } else {
-                        // Save annotations for other images via API
                         try {
                             await api.post('/save_annotation', {
                                 image_name: imagePath,
@@ -2069,12 +1546,10 @@ function App() {
                                 }))
                             });
                             
-                            // Update cache
                             if (annotationCache && annotationCache.current) {
                                 annotationCache.current[imagePath] = newAnnotations;
                             }
                             
-                            // Update annotated images set
                             setAnnotatedImages(prev => {
                                 const newSet = new Set(prev);
                                 if (newAnnotations.length > 0) {
@@ -2086,36 +1561,77 @@ function App() {
                             });
                         } catch (err) {
                             console.error('Failed to update annotations:', err);
-                            alert('Failed to update annotations: ' + (err.message || 'Unknown error'));
                         }
                     }
                 }}
             />
         )}
 
-        {/* Export Preview Modal */}
-        {showExportPreview && (
-            <ExportPreview
+            {/* Mini Map */}
+            {datasetPath && images.length > 0 && (
+                <MiniMap
                 images={images}
-                annotations={annotations}
-                classes={classes}
-                datasetPath={datasetPath}
-                onExport={async () => {
+                    currentIndex={currentImageIndex}
+                    onImageSelect={(index) => {
+                        if (index >= 0 && index < images.length) {
+                            setCurrentImageIndex(index);
+                        }
+                    }}
+                    annotatedImages={annotatedImages}
+                />
+            )}
+            
+            {/* Batch Image Actions */}
+            <BatchImageActions
+                selectedImages={selectedImages}
+                onClearSelection={() => setSelectedImages(new Set())}
+                onBatchDelete={async (imagePaths) => {
                     try {
                         setLoading(true);
-                        await api.post('/export', {
+                        for (const imgPath of imagePaths) {
+                            await api.post('/delete_image', {
                             dataset_path: datasetPath,
-                            output_path: datasetPath
-                        });
-                        alert('Export completed successfully!');
-                        setLoading(false);
+                                image_path: imgPath
+                            });
+                        }
+                        const newImages = images.filter(img => !imagePaths.includes(img));
+                        setImages(newImages);
+                        setSelectedImages(new Set());
+                        alert(`Deleted ${imagePaths.length} image(s)`);
                     } catch (err) {
-                        console.error('Export failed:', err);
-                        alert('Export failed: ' + (err.message || 'Unknown error'));
+                        console.error('Batch delete error:', err);
+                        alert('Failed to delete images: ' + (err.message || 'Unknown error'));
+                    } finally {
                         setLoading(false);
                     }
                 }}
-                onClose={() => setShowExportPreview(false)}
+                onBatchTag={(imagePaths, tags) => {
+                    const updated = { ...imageTags };
+                    imagePaths.forEach(path => {
+                        updated[path] = tags;
+                    });
+                    setImageTags(updated);
+                    try {
+                        const key = `image_tags_${datasetPath}`;
+                        localStorage.setItem(key, JSON.stringify(updated));
+                    } catch (err) {
+                        console.error('Failed to save tags:', err);
+                    }
+                    setSelectedImages(new Set());
+                }}
+                onBatchExport={(imagePaths) => {
+                    alert(`Exporting ${imagePaths.length} selected images...`);
+                    // TODO: Implement selective export
+                }}
+            />
+            
+            {/* Image Preview Tooltip */}
+            {imagePreview && (
+                <ImagePreviewTooltip
+                    imagePath={imagePreview.path}
+                    annotations={imagePreview.annotations || []}
+                    classes={classes}
+                    position={imagePreview.position || { x: 0, y: 0 }}
             />
         )}
         </>

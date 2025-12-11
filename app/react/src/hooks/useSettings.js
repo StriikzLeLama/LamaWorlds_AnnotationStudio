@@ -1,6 +1,21 @@
+/**
+ * @fileoverview useSettings Hook - Settings Management
+ * 
+ * Custom React hook that provides settings management with:
+ * - Default settings configuration
+ * - localStorage persistence
+ * - Nested key support (e.g., 'shortcuts.nextImage')
+ * - Automatic saving on changes
+ * 
+ * @module hooks/useSettings
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 
-// Default settings
+/**
+ * Default settings configuration
+ * @constant {Object}
+ */
 const DEFAULT_SETTINGS = {
     // Annotation tools
     snapToGrid: false,
@@ -89,7 +104,12 @@ const DEFAULT_SETTINGS = {
     logLevel: 'warn',
 };
 
-// Load settings from localStorage
+/**
+ * Load settings from localStorage
+ * Merges saved settings with defaults to handle new settings
+ * 
+ * @returns {Object} Settings object
+ */
 export const loadSettings = () => {
     try {
         const saved = localStorage.getItem('annotationStudio_settings');
@@ -104,7 +124,11 @@ export const loadSettings = () => {
     return DEFAULT_SETTINGS;
 };
 
-// Save settings to localStorage
+/**
+ * Save settings to localStorage
+ * 
+ * @param {Object} settings - Settings object to save
+ */
 export const saveSettings = (settings) => {
     try {
         localStorage.setItem('annotationStudio_settings', JSON.stringify(settings));
@@ -113,7 +137,26 @@ export const saveSettings = (settings) => {
     }
 };
 
-// Custom hook for settings
+/**
+ * Custom hook for settings management
+ * 
+ * Provides settings state and update functions with automatic persistence.
+ * Supports nested keys for complex settings structure.
+ * 
+ * @returns {Object} Settings API
+ * @returns {Object} returns.settings - Current settings object
+ * @returns {Function} returns.setSettings - Function to set all settings
+ * @returns {Function} returns.updateSetting - Function to update a single setting (supports nested keys)
+ * @returns {Function} returns.updateSettings - Function to update multiple settings at once
+ * @returns {Function} returns.resetSettings - Function to reset to default settings
+ * @returns {Function} returns.getSetting - Function to get a setting value (supports nested keys)
+ * 
+ * @example
+ * const { settings, updateSetting, getSetting } = useSettings();
+ * updateSetting('snapToGrid', true);
+ * updateSetting('shortcuts.nextImage', 'ArrowRight');
+ * const snapToGrid = getSetting('snapToGrid', false);
+ */
 export const useSettings = () => {
     const [settings, setSettings] = useState(() => loadSettings());
     

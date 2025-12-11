@@ -1,16 +1,71 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+/**
+ * @fileoverview RightPanel Component - Image List and Export Management
+ * 
+ * This component provides the right sidebar with:
+ * - Image list/grid view with virtualization for performance
+ * - Search and filtering capabilities
+ * - Export menu with history
+ * - Image tags and metadata
+ * - Batch image selection
+ * - Quick actions on hover
+ * - Compact/expanded mode toggle
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Array<string>} props.images - Array of image file paths
+ * @param {number} props.currentIndex - Currently selected image index
+ * @param {Function} props.setIndex - Function to change image index
+ * @param {Array<Object>} props.annotations - Current image annotations
+ * @param {Function} props.onDeleteAnnotation - Function to delete annotation
+ * @param {Function} props.onExport - Function to export dataset
+ * @param {Array<Object>} props.classes - Annotation classes
+ * @param {string} props.datasetPath - Current dataset path
+ * @param {Function} props.onChangeAnnotationClass - Function to change annotation class
+ * @param {string|null} props.selectedAnnotationId - Currently selected annotation ID
+ * @param {Function} props.onSelectAnnotation - Function to select annotation
+ * @param {string} props.searchQuery - Current search query
+ * @param {Function} props.setSearchQuery - Function to set search query
+ * @param {boolean|null} props.filterAnnotated - Filter by annotation status
+ * @param {Function} props.setFilterAnnotated - Function to set annotation filter
+ * @param {Set<string>} props.annotatedImages - Set of annotated image paths
+ * @param {number|null} props.filterClassId - Filter by class ID
+ * @param {Function} props.setFilterClassId - Function to set class filter
+ * @param {React.MutableRefObject<Object>} props.annotationCache - Annotation cache ref
+ * @param {Function} props.onDeleteImage - Function to delete image
+ * @param {Function} props.setImages - Function to update images array
+ * @param {Object} props.annotationComments - Annotation comments object
+ * @param {Function} props.onUpdateAnnotationComment - Function to update comment
+ * @param {Object} props.imageTags - Image tags object
+ * @param {Function} props.onUpdateImageTag - Function to update image tags
+ * @param {boolean} props.searchInAnnotations - Search in annotations toggle
+ * @param {Function} props.setSearchInAnnotations - Function to toggle search in annotations
+ * @param {Function} props.onOpenDatasetMerge - Function to open dataset merge modal
+ * @param {Set<string>} props.selectedImages - Set of selected image paths
+ * @param {Function} props.onToggleImageSelection - Function to toggle image selection
+ * @param {Function} props.onImagePreview - Function to show image preview
+ * @returns {JSX.Element} The rendered right panel component
+ */
+import React, { useRef, useEffect, useState, useMemo, createRef } from 'react';
+import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag, ChevronDown, ChevronUp, Download, Upload, FileText, Merge, Eye, FileJson, FileCode, History, Maximize2, Minimize2, Zap, Check } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
 const api = axios.create({ baseURL: API_URL, timeout: 10000 });
 
-function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated, annotatedImages, filterClassId, setFilterClassId, annotationCache, onDeleteImage, setImages, annotationComments = {}, onUpdateAnnotationComment, imageTags = {}, onUpdateImageTag, searchInAnnotations = false, setSearchInAnnotations }) {
+function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated, annotatedImages, filterClassId, setFilterClassId, annotationCache, onDeleteImage, setImages, annotationComments = {}, onUpdateAnnotationComment, imageTags = {}, onUpdateImageTag, searchInAnnotations = false, setSearchInAnnotations, onOpenDatasetMerge, selectedImages = new Set(), onToggleImageSelection, onImagePreview }) {
+    // State for class selector dropdowns (one per annotation)
+    const [openSelectors, setOpenSelectors] = useState({});
+    const [classSearchQueries, setClassSearchQueries] = useState({});
+    const selectorRefs = useRef({});
+    // State for image class filter selector
+    const [isImageClassFilterOpen, setIsImageClassFilterOpen] = useState(false);
+    const [imageClassFilterSearch, setImageClassFilterSearch] = useState('');
+    const imageClassFilterRef = useRef(null);
     const activeRef = useRef(null);
     const [imagesByClass, setImagesByClass] = useState(new Map());
     const [loadingClassFilter, setLoadingClassFilter] = useState(false);
     const [sortOrder, setSortOrder] = useState('name-asc'); // 'name-asc', 'name-desc', 'date-asc', 'date-desc'
-    const [selectedImages, setSelectedImages] = useState(new Set());
+    // Note: selectedImages comes from props, no local state needed
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [imagesToDelete, setImagesToDelete] = useState([]);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
@@ -23,6 +78,136 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
     const [filterMinRatio, setFilterMinRatio] = useState('');
     const [filterMaxRatio, setFilterMaxRatio] = useState('');
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showExportHistory, setShowExportHistory] = useState(false);
+    const [exportHistory, setExportHistory] = useState([]);
+    const [compactMode, setCompactMode] = useState(false);
+    const [hoveredImageIndex, setHoveredImageIndex] = useState(null);
+    const exportMenuRef = useRef(null);
+    const exportHistoryRef = useRef(null);
+    
+    // Load export history from localStorage
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('export_history');
+            if (saved) {
+                setExportHistory(JSON.parse(saved));
+            }
+        } catch (err) {
+            console.error('Failed to load export history:', err);
+        }
+    }, []);
+    
+    // Save export to history
+    const saveToExportHistory = (format, result) => {
+        const newEntry = {
+            format,
+            timestamp: Date.now(),
+            result: result || {}
+        };
+        const updated = [newEntry, ...exportHistory].slice(0, 10); // Keep last 10
+        setExportHistory(updated);
+        try {
+            localStorage.setItem('export_history', JSON.stringify(updated));
+        } catch (err) {
+            console.error('Failed to save export history:', err);
+        }
+    };
+    
+    // Close menus when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+                setShowExportMenu(false);
+            }
+            if (exportHistoryRef.current && !exportHistoryRef.current.contains(event.target)) {
+                setShowExportHistory(false);
+            }
+            // Close all open selectors when clicking outside
+            const clickedInsideSelector = Object.values(selectorRefs.current).some(ref => 
+                ref && ref.current && ref.current.contains(event.target)
+            );
+            if (!clickedInsideSelector) {
+                setOpenSelectors({});
+            }
+            // Close image class filter selector when clicking outside
+            if (imageClassFilterRef.current && !imageClassFilterRef.current.contains(event.target)) {
+                setIsImageClassFilterOpen(false);
+            }
+        };
+        
+        if (showExportMenu || showExportHistory || Object.keys(openSelectors).length > 0 || isImageClassFilterOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showExportMenu, showExportHistory, openSelectors, isImageClassFilterOpen]);
+    
+    // Initialize selector refs
+    useEffect(() => {
+        if (Array.isArray(annotations)) {
+            annotations.forEach(ann => {
+                if (!selectorRefs.current[ann.id]) {
+                    selectorRefs.current[ann.id] = createRef();
+                }
+            });
+        }
+    }, [annotations]);
+    
+    // Toggle selector open/closed
+    const toggleSelector = (annId) => {
+        setOpenSelectors(prev => ({
+            ...prev,
+            [annId]: !prev[annId]
+        }));
+        // Initialize search query if opening
+        if (!openSelectors[annId]) {
+            setClassSearchQueries(prev => ({
+                ...prev,
+                [annId]: ''
+            }));
+        }
+    };
+    
+    // Filter classes based on search query
+    const getFilteredClasses = (annId) => {
+        if (!Array.isArray(classes)) return [];
+        const searchQuery = classSearchQueries[annId] || '';
+        if (!searchQuery) return classes;
+        const searchLower = searchQuery.toLowerCase();
+        return classes.filter(c => c && c.name && c.name.toLowerCase().includes(searchLower));
+    };
+    
+    // Filter classes for image class filter
+    const getFilteredClassesForImageFilter = () => {
+        if (!Array.isArray(classes)) return [];
+        if (!imageClassFilterSearch) return classes;
+        const searchLower = imageClassFilterSearch.toLowerCase();
+        return classes.filter(c => c && c.name && c.name.toLowerCase().includes(searchLower));
+    };
+    
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !e.shiftKey) {
+                e.preventDefault();
+                setShowExportMenu(!showExportMenu);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'i' && !e.shiftKey) {
+                e.preventDefault();
+                onExport && onExport('import_project');
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'm' && !e.shiftKey) {
+                e.preventDefault();
+                onOpenDatasetMerge && onOpenDatasetMerge();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [showExportMenu, onExport, onOpenDatasetMerge]);
 
     useEffect(() => {
         if (activeRef.current) {
@@ -278,17 +463,18 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
 
     return (
         <div className="glass-panel" style={{ 
-            width: '320px', 
+            width: isCollapsed ? '60px' : '320px', 
             margin: '10px', 
             padding: isCollapsed ? '8px 15px' : '15px',
             display: 'flex', 
             flexDirection: 'column',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            overflow: isCollapsed ? 'hidden' : 'visible'
         }}>
             <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                justifyContent: 'space-between',
+                justifyContent: isCollapsed ? 'center' : 'space-between',
                 marginBottom: isCollapsed ? 0 : '10px',
                 cursor: 'pointer',
                 userSelect: 'none',
@@ -297,7 +483,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
             }}
             onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                <h4 className="neon-text" style={{ margin: 0 }}>Images & Annotations</h4>
+                {!isCollapsed && <h4 className="neon-text" style={{ margin: 0 }}>Images & Annotations</h4>}
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
@@ -336,6 +522,9 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                     {Array.isArray(annotations) && annotations.map((ann, i) => {
                         const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
                         const isSelected = selectedAnnotationId === ann.id;
+                        const isOpen = openSelectors[ann.id] || false;
+                        const filteredClasses = getFilteredClasses(ann.id);
+                        
                         return (
                             <div 
                                 key={ann.id} 
@@ -349,30 +538,138 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     background: isSelected ? 'rgba(0, 224, 255, 0.1)' : 'transparent',
                                     cursor: 'pointer',
                                     borderRadius: '4px',
-                                    marginBottom: '2px'
+                                    marginBottom: '2px',
+                                    position: 'relative'
                                 }}
                             >
                                 <Box size={14} style={{ marginRight: '8px', color: cls?.color || '#56b0ff' }} />
-                                <select
-                                    value={ann.class_id}
-                                    onChange={(e) => {
-                                        e.stopPropagation();
-                                        handleClassChange(ann.id, e.target.value);
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    style={{
-                                        flex: 1,
-                                        fontSize: '0.9rem',
-                                        padding: '4px 8px',
-                                        marginRight: '8px'
-                                    }}
-                                >
-                                    {Array.isArray(classes) && classes.map(c => (
-                                        <option key={c.id} value={c.id} style={{ background: '#1a1a2e', color: 'white' }}>
-                                            {c.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                
+                                {/* Custom Class Selector */}
+                                <div ref={selectorRefs.current[ann.id] || createRef()} style={{ flex: 1, position: 'relative', marginRight: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSelector(ann.id);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            fontSize: '0.9rem',
+                                            padding: '4px 8px',
+                                            background: 'rgba(255,255,255,0.1)',
+                                            border: '1px solid rgba(255,255,255,0.2)',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            textAlign: 'left'
+                                        }}
+                                    >
+                                        <span>{cls?.name || `Class ${ann.class_id}`}</span>
+                                        <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                                    </button>
+                                    
+                                    {/* Dropdown with search */}
+                                    {isOpen && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: 0,
+                                            right: 0,
+                                            marginTop: '4px',
+                                            background: 'rgba(20, 20, 35, 0.95)',
+                                            backdropFilter: 'blur(10px)',
+                                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                                            borderRadius: '8px',
+                                            padding: '8px',
+                                            zIndex: 1000,
+                                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                                            maxHeight: '300px',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}>
+                                            {/* Search input */}
+                                            <div style={{ position: 'relative', marginBottom: '8px' }}>
+                                                <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', zIndex: 1 }} />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search classes..."
+                                                    value={classSearchQueries[ann.id] || ''}
+                                                    onChange={(e) => {
+                                                        setClassSearchQueries(prev => ({
+                                                            ...prev,
+                                                            [ann.id]: e.target.value
+                                                        }));
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '6px 8px 6px 30px',
+                                                        background: 'rgba(255,255,255,0.1)',
+                                                        border: '1px solid rgba(255,255,255,0.2)',
+                                                        borderRadius: '4px',
+                                                        color: 'white',
+                                                        fontSize: '0.85rem',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                />
+                                            </div>
+                                            
+                                            {/* Class list */}
+                                            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                                {filteredClasses.length > 0 ? (
+                                                    filteredClasses.map(c => (
+                                                        <div
+                                                            key={c.id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleClassChange(ann.id, c.id);
+                                                                setOpenSelectors(prev => ({
+                                                                    ...prev,
+                                                                    [ann.id]: false
+                                                                }));
+                                                            }}
+                                                            style={{
+                                                                padding: '6px 8px',
+                                                                cursor: 'pointer',
+                                                                borderRadius: '4px',
+                                                                background: ann.class_id === c.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
+                                                                border: ann.class_id === c.id ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                                marginBottom: '2px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px',
+                                                                fontSize: '0.85rem'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (ann.class_id !== c.id) {
+                                                                    e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (ann.class_id !== c.id) {
+                                                                    e.target.style.background = 'transparent';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}` }}></div>
+                                                            <span>{c.name}</span>
+                                                            {ann.class_id === c.id && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div style={{ padding: '8px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
+                                                        No classes found
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                                 {ann.confidence !== undefined && ann.confidence < 1.0 && (
                                     <span 
                                         style={{ 
@@ -399,18 +696,30 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                         onDeleteAnnotation(ann.id);
                                     }} 
                                     style={{ 
-                                        background: 'none', 
-                                        border: 'none', 
+                                        background: 'rgba(255, 68, 68, 0.2)', 
+                                        border: '1px solid rgba(255, 68, 68, 0.5)', 
                                         color: '#ff4444', 
                                         cursor: 'pointer', 
-                                        fontSize: '1.2rem', 
-                                        padding: '0 5px',
-                                        opacity: 0.7
+                                        fontSize: '0.85rem', 
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s',
+                                        minWidth: '32px'
                                     }}
-                                    onMouseEnter={(e) => e.target.style.opacity = '1'}
-                                    onMouseLeave={(e) => e.target.style.opacity = '0.7'}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = 'rgba(255, 68, 68, 0.4)';
+                                        e.target.style.borderColor = '#ff4444';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = 'rgba(255, 68, 68, 0.2)';
+                                        e.target.style.borderColor = 'rgba(255, 68, 68, 0.5)';
+                                    }}
+                                    title="Delete annotation (Delete key)"
                                 >
-                                    ×
+                                    <Trash2 size={14} />
                                 </button>
                             </div>
                         );
@@ -771,27 +1080,168 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 Clear Filters
                             </button>
                         )}
-                        {/* Class Filter */}
-                        <div style={{ position: 'relative' }}>
-                            <select
-                                value={filterClassId === null ? '' : filterClassId}
-                                onChange={(e) => setFilterClassId && setFilterClassId(e.target.value === '' ? null : parseInt(e.target.value))}
+                        {/* Class Filter - Custom Selector with Search */}
+                        <div ref={imageClassFilterRef} style={{ position: 'relative' }}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsImageClassFilterOpen(!isImageClassFilterOpen);
+                                    if (!isImageClassFilterOpen) {
+                                        setImageClassFilterSearch('');
+                                    }
+                                }}
                                 disabled={loadingClassFilter}
                                 style={{
                                     width: '100%',
                                     fontSize: '0.75rem',
                                     padding: '4px 8px',
-                                    opacity: loadingClassFilter ? 0.6 : 1,
-                                    cursor: loadingClassFilter ? 'wait' : 'pointer'
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    cursor: loadingClassFilter ? 'wait' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    textAlign: 'left',
+                                    opacity: loadingClassFilter ? 0.6 : 1
                                 }}
                             >
-                                <option value="">All Classes</option>
-                                {Array.isArray(classes) && classes.map(cls => (
-                                    <option key={cls.id} value={cls.id} style={{ background: '#1a1a2e', color: 'white' }}>
-                                        {cls.name}
-                                    </option>
-                                ))}
-                            </select>
+                                <span>
+                                    {filterClassId === null 
+                                        ? 'All Classes' 
+                                        : (Array.isArray(classes) && classes.find(c => c && c.id === filterClassId)?.name) || `Class ${filterClassId}`
+                                    }
+                                </span>
+                                <ChevronDown size={14} style={{ transform: isImageClassFilterOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                            </button>
+                            
+                            {/* Dropdown with search */}
+                            {isImageClassFilterOpen && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: '4px',
+                                    background: 'rgba(20, 20, 35, 0.95)',
+                                    backdropFilter: 'blur(10px)',
+                                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                                    borderRadius: '8px',
+                                    padding: '8px',
+                                    zIndex: 1000,
+                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                                    maxHeight: '300px',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}>
+                                    {/* Search input */}
+                                    <div style={{ position: 'relative', marginBottom: '8px' }}>
+                                        <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', zIndex: 1 }} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search classes..."
+                                            value={imageClassFilterSearch}
+                                            onChange={(e) => setImageClassFilterSearch(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            autoFocus
+                                            style={{
+                                                width: '100%',
+                                                padding: '6px 8px 6px 30px',
+                                                background: 'rgba(255,255,255,0.1)',
+                                                border: '1px solid rgba(255,255,255,0.2)',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                fontSize: '0.85rem',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+                                    
+                                    {/* Class list */}
+                                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                        {/* "All Classes" option */}
+                                        <div
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (setFilterClassId) setFilterClassId(null);
+                                                setIsImageClassFilterOpen(false);
+                                            }}
+                                            style={{
+                                                padding: '6px 8px',
+                                                cursor: 'pointer',
+                                                borderRadius: '4px',
+                                                background: filterClassId === null ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
+                                                border: filterClassId === null ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                marginBottom: '2px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: '0.85rem'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (filterClassId !== null) {
+                                                    e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (filterClassId !== null) {
+                                                    e.target.style.background = 'transparent';
+                                                }
+                                            }}
+                                        >
+                                            <span>All Classes</span>
+                                            {filterClassId === null && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                        </div>
+                                        
+                                        {/* Filtered classes */}
+                                        {getFilteredClassesForImageFilter().length > 0 ? (
+                                            getFilteredClassesForImageFilter().map(c => (
+                                                <div
+                                                    key={c.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (setFilterClassId) setFilterClassId(c.id);
+                                                        setIsImageClassFilterOpen(false);
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 8px',
+                                                        cursor: 'pointer',
+                                                        borderRadius: '4px',
+                                                        background: filterClassId === c.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
+                                                        border: filterClassId === c.id ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                        marginBottom: '2px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        fontSize: '0.85rem'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (filterClassId !== c.id) {
+                                                            e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (filterClassId !== c.id) {
+                                                            e.target.style.background = 'transparent';
+                                                        }
+                                                    }}
+                                                >
+                                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}` }}></div>
+                                                    <span>{c.name}</span>
+                                                    {filterClassId === c.id && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '8px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
+                                                No classes found
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
                             {loadingClassFilter && (
                                 <div style={{
                                     position: 'absolute',
@@ -799,7 +1249,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     fontSize: '0.7rem',
-                                    color: '#00e0ff'
+                                    color: '#00e0ff',
+                                    pointerEvents: 'none'
                                 }}>
                                     Loading...
                                 </div>
@@ -808,419 +1259,396 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                     </div>
                 </div>
                 
-                <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ flex: 1, overflowY: 'auto' }} id="image-list-container">
                     {viewMode === 'grid' ? (
-                        // Grid View
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                            gap: '12px',
-                            padding: '4px'
-                        }}>
-                            {filteredImages.map((img, filteredIdx) => {
-                                const originalIdx = filteredToOriginal.get(filteredIdx);
-                                const isCurrent = originalIdx !== undefined && originalIdx === currentIndex;
-                                const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
-                                
-                                return (
-                                    <div
-                                        key={img}
-                                        ref={isCurrent ? activeRef : null}
-                                        onClick={() => {
-                                            if (originalIdx !== undefined && originalIdx >= 0) {
-                                                setIndex(originalIdx);
-                                            }
-                                        }}
-                                        style={{
-                                            position: 'relative',
-                                            cursor: 'pointer',
-                                            background: isCurrent ? 'rgba(0, 224, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                                            border: isCurrent ? '2px solid #00e0ff' : '1px solid rgba(255, 255, 255, 0.1)',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            transition: 'all 0.2s ease',
-                                            aspectRatio: '1'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (!isCurrent) {
-                                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                                                e.currentTarget.style.borderColor = 'rgba(0, 224, 255, 0.3)';
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (!isCurrent) {
-                                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                                            }
-                                        }}
-                                    >
-                                        <img 
-                                            src={img} 
-                                            alt={getName(img)}
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                                display: 'block'
-                                            }}
-                                            onError={(e) => {
-                                                e.target.style.display = 'none';
-                                                e.target.parentElement.innerHTML = '<div style="color: #666; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; height: 100%;">IMG</div>';
-                                            }}
-                                        />
-                                        {/* Annotation overlay */}
-                                        {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && Array.isArray(annotationCache.current[img]) && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 0,
-                                                pointerEvents: 'none'
-                                            }}>
-                                                {annotationCache.current[img].slice(0, 5).map((ann, annIdx) => {
-                                                    const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
-                                                    if (!cls) return null;
-                                                    return (
-                                                        <div
-                                                            key={annIdx}
-                                                            style={{
-                                                                position: 'absolute',
-                                                                left: `${(ann.x / 100) * 100}%`,
-                                                                top: `${(ann.y / 100) * 100}%`,
-                                                                width: `${(ann.width / 100) * 100}%`,
-                                                                height: `${(ann.height / 100) * 100}%`,
-                                                                border: `1px solid ${cls.color}`,
-                                                                background: `${cls.color}33`,
-                                                                boxShadow: `0 0 2px ${cls.color}`
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        {/* Badge */}
-                                        {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && annotationCache.current[img].length > 0 && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '4px',
-                                                right: '4px',
-                                                background: 'rgba(0, 224, 255, 0.9)',
-                                                color: '#000',
-                                                borderRadius: '50%',
-                                                width: '20px',
-                                                height: '20px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '0.7rem',
-                                                fontWeight: 'bold',
-                                                boxShadow: '0 0 4px rgba(0, 224, 255, 0.5)'
-                                            }}>
-                                                {annotationCache.current[img].length}
-                                            </div>
-                                        )}
-                                        {/* Image name overlay */}
-                                        <div style={{
-                                            position: 'absolute',
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
-                                            background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)',
-                                            padding: '8px 4px 4px',
-                                            fontSize: '0.7rem',
-                                            color: '#fff',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
-                                        }}>
-                                            {getName(img)}
-                                        </div>
-                                        {/* Delete button */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteImage(img, originalIdx);
-                                            }}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '4px',
-                                                left: '4px',
-                                                background: 'rgba(255, 68, 68, 0.8)',
-                                                border: 'none',
-                                                borderRadius: '50%',
-                                                width: '20px',
-                                                height: '20px',
-                                                color: '#fff',
-                                                cursor: 'pointer',
-                                                fontSize: '0.7rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                opacity: 0,
-                                                transition: 'opacity 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => e.target.style.opacity = '1'}
-                                            onMouseLeave={(e) => e.target.style.opacity = '0'}
-                                            title="Delete image"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        // Grid View with Virtual Scrolling for large lists
+                        <VirtualizedImageGrid
+                            images={filteredImages}
+                            filteredToOriginal={filteredToOriginal}
+                            currentIndex={currentIndex}
+                            setIndex={setIndex}
+                            annotatedImages={annotatedImages}
+                            activeRef={activeRef}
+                            annotationCache={annotationCache}
+                            classes={classes}
+                            imageTags={imageTags}
+                            onUpdateImageTag={onUpdateImageTag}
+                            setShowTagEditor={setShowTagEditor}
+                            setTagEditorImage={setTagEditorImage}
+                            onDeleteImage={handleDeleteImage}
+                            getName={getName}
+                            hoveredImageIndex={hoveredImageIndex}
+                            setHoveredImageIndex={setHoveredImageIndex}
+                            selectedImages={selectedImages}
+                            onToggleImageSelection={onToggleImageSelection}
+                        />
                     ) : (
-                        // List View
-                        <div>
-                        {filteredImages.map((img, filteredIdx) => {
-                            const originalIdx = filteredToOriginal.get(filteredIdx);
-                            const isCurrent = originalIdx !== undefined && originalIdx === currentIndex;
-                            const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
-                            
-                            return (
-                                <div
-                                    key={img}
-                                    ref={isCurrent ? activeRef : null}
-                                    onClick={() => {
-                                        if (originalIdx !== undefined && originalIdx >= 0) {
-                                            setIndex(originalIdx);
-                                        }
-                                    }}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '8px',
-                                        cursor: 'pointer',
-                                        color: isCurrent ? '#fff' : '#aaa',
-                                        background: isCurrent ? 'rgba(0, 224, 255, 0.15)' : 'transparent',
-                                        borderLeft: isCurrent ? '3px solid var(--neon-blue)' : '3px solid transparent',
-                                        marginBottom: '4px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.85rem',
-                                        transition: 'all 0.2s ease',
-                                        position: 'relative'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isCurrent) {
-                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isCurrent) {
-                                            e.currentTarget.style.background = 'transparent';
-                                        }
-                                    }}
-                                >
-                                {/* Thumbnail with annotation preview */}
-                                <div style={{
-                                    width: '50px',
-                                    height: '50px',
-                                    minWidth: '50px',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    borderRadius: '4px',
-                                    marginRight: '8px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'hidden',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    position: 'relative'
-                                }}>
-                                    <img 
-                                        src={img} 
-                                        alt=""
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover'
-                                        }}
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.parentElement.innerHTML = '<div style="color: #666; font-size: 0.7rem;">IMG</div>';
-                                        }}
-                                    />
-                                    {/* Show annotation count badge */}
-                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && annotationCache.current[img].length > 0 && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '2px',
-                                            right: '2px',
-                                            background: 'rgba(0, 224, 255, 0.9)',
-                                            color: '#000',
-                                            borderRadius: '50%',
-                                            width: '16px',
-                                            height: '16px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '0.65rem',
-                                            fontWeight: 'bold',
-                                            boxShadow: '0 0 4px rgba(0, 224, 255, 0.5)'
-                                        }}>
-                                            {annotationCache.current[img].length}
-                                        </div>
-                                    )}
-                                    {/* Draw annotation boxes on thumbnail */}
-                                    {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && Array.isArray(annotationCache.current[img]) && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            pointerEvents: 'none'
-                                        }}>
-                                            {annotationCache.current[img].slice(0, 3).map((ann, annIdx) => {
-                                                const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
-                                                if (!cls) return null;
-                                                // Scale annotation to thumbnail size (assuming image is loaded)
-                                                return (
-                                                    <div
-                                                        key={annIdx}
-                                                        style={{
-                                                            position: 'absolute',
-                                                            left: `${(ann.x / 100) * 100}%`,
-                                                            top: `${(ann.y / 100) * 100}%`,
-                                                            width: `${(ann.width / 100) * 100}%`,
-                                                            height: `${(ann.height / 100) * 100}%`,
-                                                            border: `1px solid ${cls.color}`,
-                                                            background: `${cls.color}33`,
-                                                            boxShadow: `0 0 2px ${cls.color}`
-                                                        }}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        marginBottom: '2px'
-                                    }}>
-                                        {getName(img)}
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', color: '#666', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                        {hasAnnotations ? (
-                                            <><CheckCircle size={10} style={{ color: '#00ff00' }} /> Annotated</>
-                                        ) : (
-                                            <><Circle size={10} style={{ color: '#666' }} /> Empty</>
-                                        )}
-                                        {/* Tags */}
-                                        {imageTags && imageTags[img] && Array.isArray(imageTags[img]) && imageTags[img].length > 0 && (
-                                            <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', marginLeft: '4px' }}>
-                                                {imageTags[img].slice(0, 2).map((tag, idx) => (
-                                                    <span key={idx} style={{
-                                                        background: 'rgba(0, 224, 255, 0.2)',
-                                                        color: '#00e0ff',
-                                                        fontSize: '0.65rem',
-                                                        padding: '1px 4px',
-                                                        borderRadius: '3px',
-                                                        border: '1px solid rgba(0, 224, 255, 0.3)'
-                                                    }}>
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                                {imageTags[img].length > 2 && (
-                                                    <span style={{ color: '#666', fontSize: '0.65rem' }}>
-                                                        +{imageTags[img].length - 2}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {/* Tag and Delete buttons */}
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setTagEditorImage(img);
-                                            setTagInput((imageTags && imageTags[img] ? imageTags[img].join(', ') : ''));
-                                            setShowTagEditor(true);
-                                        }}
-                                        style={{
-                                            background: 'rgba(0, 224, 255, 0.1)',
-                                            border: '1px solid rgba(0, 224, 255, 0.3)',
-                                            borderRadius: '4px',
-                                            padding: '4px 6px',
-                                            color: '#00e0ff',
-                                            cursor: 'pointer',
-                                            fontSize: '0.75rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            opacity: 0.7,
-                                            transition: 'opacity 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => e.target.style.opacity = '1'}
-                                        onMouseLeave={(e) => e.target.style.opacity = '0.7'}
-                                        title="Edit tags"
-                                    >
-                                        <Tag size={12} />
-                                    </button>
-                                    {/* Delete button */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteImage(img, originalIdx);
-                                    }}
-                                    style={{
-                                        background: 'rgba(255, 68, 68, 0.1)',
-                                        border: '1px solid rgba(255, 68, 68, 0.3)',
-                                        borderRadius: '4px',
-                                        padding: '4px 6px',
-                                        color: '#ff4444',
-                                        cursor: 'pointer',
+                        // List View with Virtual Scrolling
+                        <VirtualizedImageList
+                            images={filteredImages}
+                            filteredToOriginal={filteredToOriginal}
+                            currentIndex={currentIndex}
+                            setIndex={setIndex}
+                            annotatedImages={annotatedImages}
+                            activeRef={activeRef}
+                            getName={getName}
+                            hoveredImageIndex={hoveredImageIndex}
+                            setHoveredImageIndex={setHoveredImageIndex}
+                            onDeleteImage={handleDeleteImage}
+                            selectedImages={selectedImages}
+                            onToggleImageSelection={onToggleImageSelection}
+                        />
+                    )}
+                </div>
+
+                {/* Export & Actions - Compact Menu */}
+                <div style={{ padding: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    {/* Compact Mode Toggle */}
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                        <button
+                            onClick={() => setCompactMode(!compactMode)}
+                            style={{
+                                flex: 1,
+                                padding: '6px',
+                                background: compactMode ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '4px',
+                                color: '#aaa',
+                                cursor: 'pointer',
+                                fontSize: '0.7rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                            }}
+                            title={compactMode ? 'Switch to expanded view' : 'Switch to compact view'}
+                        >
+                            {compactMode ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
+                            {compactMode ? 'Expand' : 'Compact'}
+                        </button>
+                    </div>
+                    
+                    {/* Export Menu Button */}
+                    <div ref={exportMenuRef} style={{ position: 'relative', marginBottom: '8px' }}>
+                        <button 
+                            className="btn-primary" 
+                            style={{ 
+                                width: '100%', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                padding: compactMode ? '6px 8px' : '8px 12px',
+                                fontSize: compactMode ? '0.75rem' : '0.85rem'
+                            }} 
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            title="Export (Ctrl+E)"
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Download size={compactMode ? 14 : 16} />
+                                {!compactMode && <span>Export</span>}
+                            </div>
+                            <ChevronDown size={14} style={{ transform: showExportMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                        </button>
+                        
+                        {/* Export Dropdown Menu */}
+                        {showExportMenu && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '100%',
+                                left: 0,
+                                right: 0,
+                                marginBottom: '4px',
+                                background: 'rgba(20, 20, 35, 0.95)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                borderRadius: '8px',
+                                padding: '6px',
+                                zIndex: 1000,
+                                maxHeight: '400px',
+                                overflowY: 'auto',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                                minWidth: '200px',
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '4px'
+                            }}>
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
                                         fontSize: '0.75rem',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        opacity: 0.7,
-                                        transition: 'opacity 0.2s'
+                                        gap: '6px',
+                                        justifyContent: 'flex-start'
+                                    }} 
+                                    onClick={() => { 
+                                        if (onExport) {
+                                            try {
+                                                const result = onExport('preview');
+                                                if (result && typeof result.then === 'function') {
+                                                    result.then(res => saveToExportHistory('preview', res)).catch(() => {});
+                                                } else {
+                                                    saveToExportHistory('preview', result);
+                                                }
+                                            } catch (err) {
+                                                console.error('Export error:', err);
+                                            }
+                                        }
+                                        setShowExportMenu(false); 
                                     }}
-                                    onMouseEnter={(e) => e.target.style.opacity = '1'}
-                                    onMouseLeave={(e) => e.target.style.opacity = '0.7'}
-                                    title="Delete image"
+                                    title="Preview export"
                                 >
-                                    <Trash2 size={12} />
+                                    <Eye size={14} />
+                                    Preview
                                 </button>
-                            </div>
-                                </div>
-                            );
-                        })}
-                        {filteredImages.length === 0 && (
-                            <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '0.85rem' }}>
-                                No images found
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        justifyContent: 'flex-start'
+                                    }} 
+                                    onClick={() => { 
+                                        if (onExport) {
+                                            try {
+                                                const result = onExport('coco');
+                                                if (result && typeof result.then === 'function') {
+                                                    result.then(res => saveToExportHistory('coco', res)).catch(() => {});
+                                                } else {
+                                                    saveToExportHistory('coco', result);
+                                                }
+                                            } catch (err) {
+                                                console.error('Export error:', err);
+                                            }
+                                        }
+                                        setShowExportMenu(false); 
+                                    }}
+                                    title="Export to COCO format"
+                                >
+                                    <FileJson size={14} />
+                                    COCO
+                                </button>
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        justifyContent: 'flex-start'
+                                    }} 
+                                    onClick={() => { 
+                                        if (onExport) {
+                                            try {
+                                                const result = onExport('voc');
+                                                if (result && typeof result.then === 'function') {
+                                                    result.then(res => saveToExportHistory('voc', res)).catch(() => {});
+                                                } else {
+                                                    saveToExportHistory('voc', result);
+                                                }
+                                            } catch (err) {
+                                                console.error('Export error:', err);
+                                            }
+                                        }
+                                        setShowExportMenu(false); 
+                                    }}
+                                    title="Export to VOC format"
+                                >
+                                    <FileCode size={14} />
+                                    VOC
+                                </button>
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        justifyContent: 'flex-start'
+                                    }} 
+                                    onClick={() => { 
+                                        if (onExport) {
+                                            try {
+                                                const result = onExport('report');
+                                                if (result && typeof result.then === 'function') {
+                                                    result.then(res => saveToExportHistory('report', res)).catch(() => {});
+                                                } else {
+                                                    saveToExportHistory('report', result);
+                                                }
+                                            } catch (err) {
+                                                console.error('Export error:', err);
+                                            }
+                                        }
+                                        setShowExportMenu(false); 
+                                    }}
+                                    title="Export statistics report"
+                                >
+                                    <FileText size={14} />
+                                    Report
+                                </button>
+                                <button 
+                                    className="btn-secondary"
+                                    style={{ 
+                                        padding: '6px 8px', 
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        justifyContent: 'flex-start',
+                                        gridColumn: '1 / -1'
+                                    }} 
+                                    onClick={() => { 
+                                        if (onExport) {
+                                            try {
+                                                const result = onExport('project');
+                                                if (result && typeof result.then === 'function') {
+                                                    result.then(res => saveToExportHistory('project', res)).catch(() => {});
+                                                } else {
+                                                    saveToExportHistory('project', result);
+                                                }
+                                            } catch (err) {
+                                                console.error('Export error:', err);
+                                            }
+                                        }
+                                        setShowExportMenu(false); 
+                                    }}
+                                    title="Export complete project"
+                                >
+                                    <Download size={14} />
+                                    Export Project
+                                </button>
+                                {exportHistory.length > 0 && (
+                                    <button 
+                                        className="btn-secondary"
+                                        style={{ 
+                                            padding: '6px 8px', 
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            justifyContent: 'flex-start',
+                                            gridColumn: '1 / -1',
+                                            borderTop: '1px solid rgba(255,255,255,0.1)',
+                                            marginTop: '4px',
+                                            paddingTop: '8px'
+                                        }} 
+                                        onClick={() => { setShowExportHistory(!showExportHistory); setShowExportMenu(false); }}
+                                        title="View export history"
+                                    >
+                                        <History size={14} />
+                                        History ({exportHistory.length})
+                                    </button>
+                                )}
                             </div>
                         )}
+                    </div>
+                    
+                    {/* Import & Merge - Compact buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: onOpenDatasetMerge ? '1fr 1fr' : '1fr', gap: '6px' }}>
+                        <button 
+                            className="btn-primary" 
+                            style={{ 
+                                padding: compactMode ? '6px 8px' : '8px 12px',
+                                fontSize: compactMode ? '0.75rem' : '0.85rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                            }} 
+                            onClick={() => { onExport && onExport('import_project'); }}
+                            title="Import project (Ctrl+I)"
+                        >
+                            <Upload size={compactMode ? 14 : 16} />
+                            {!compactMode && 'Import'}
+                        </button>
+                        {onOpenDatasetMerge && (
+                            <button 
+                                className="btn-primary" 
+                                style={{ 
+                                    padding: compactMode ? '6px 8px' : '8px 12px',
+                                    fontSize: compactMode ? '0.75rem' : '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    background: 'rgba(0, 224, 255, 0.15)',
+                                    border: '1px solid rgba(0, 224, 255, 0.5)'
+                                }} 
+                                onClick={onOpenDatasetMerge}
+                                title="Merge multiple datasets (Ctrl+M)"
+                            >
+                                <Merge size={compactMode ? 14 : 16} />
+                                {!compactMode && 'Merge'}
+                            </button>
+                        )}
+                    </div>
+                    
+                    {/* Export History Dropdown */}
+                    {showExportHistory && exportHistory.length > 0 && (
+                        <div ref={exportHistoryRef} style={{
+                            marginTop: '8px',
+                            padding: '8px',
+                            background: 'rgba(20, 20, 35, 0.95)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            borderRadius: '8px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            maxWidth: '100%',
+                            boxSizing: 'border-box'
+                        }}>
+                            <div style={{ fontSize: '0.75rem', color: '#00e0ff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <History size={14} />
+                                Recent Exports
+                            </div>
+                            {exportHistory.map((entry, idx) => (
+                                <div key={idx} style={{
+                                    padding: '6px',
+                                    marginBottom: '4px',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <div>
+                                        <div style={{ color: '#aaa' }}>{entry.format.toUpperCase()}</div>
+                                        <div style={{ color: '#666', fontSize: '0.65rem' }}>
+                                            {new Date(entry.timestamp).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (onExport) {
+                                                onExport(entry.format);
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '2px 6px',
+                                            background: 'rgba(0, 224, 255, 0.1)',
+                                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                                            borderRadius: '4px',
+                                            color: '#00e0ff',
+                                            cursor: 'pointer',
+                                            fontSize: '0.65rem'
+                                        }}
+                                        title="Re-export"
+                                    >
+                                        <Zap size={12} />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
-
-                {/* Export Button */}
-                <div style={{ padding: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('preview')}>
-                    EXPORT (Preview)
-                </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('coco')}>
-                    EXPORT COCO
-                </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('voc')}>
-                    EXPORT VOC
-                </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('report')}>
-                    EXPORT REPORT
-                </button>
-                <button className="btn-primary" style={{ width: '100%', marginBottom: '8px' }} onClick={() => onExport && onExport('project')}>
-                    EXPORT PROJECT
-                </button>
-                <button className="btn-primary" style={{ width: '100%' }} onClick={() => onExport('import_project')}>
-                    IMPORT PROJECT
-                </button>
-                </div>
                 </>
             )}
             
@@ -1335,6 +1763,387 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                         </div>
                     </div>
                 </div>
+            )}
+        </div>
+    );
+}
+
+// Virtualized Image Grid Component for performance
+function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setIndex, annotatedImages, activeRef, annotationCache, classes, imageTags, onUpdateImageTag, setShowTagEditor, setTagEditorImage, onDeleteImage, getName, hoveredImageIndex, setHoveredImageIndex, selectedImages = new Set(), onToggleImageSelection }) {
+    const containerRef = useRef(null);
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+    const ITEM_HEIGHT = 140; // Approximate height of grid item
+    const ITEMS_PER_ROW = 3; // Adjust based on container width
+    
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        const handleScroll = () => {
+            const scrollTop = container.scrollTop;
+            const containerHeight = container.clientHeight;
+            const rowHeight = ITEM_HEIGHT;
+            const startRow = Math.floor(scrollTop / rowHeight);
+            const endRow = Math.ceil((scrollTop + containerHeight) / rowHeight);
+            
+            const start = Math.max(0, startRow * ITEMS_PER_ROW - ITEMS_PER_ROW); // Buffer
+            const end = Math.min(images.length, endRow * ITEMS_PER_ROW + ITEMS_PER_ROW * 2); // Buffer
+            
+            setVisibleRange({ start, end });
+        };
+        
+        container.addEventListener('scroll', handleScroll);
+        handleScroll(); // Initial calculation
+        
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [images.length]);
+    
+    const visibleImages = images.slice(visibleRange.start, visibleRange.end);
+    const startOffset = Math.floor(visibleRange.start / ITEMS_PER_ROW) * ITEM_HEIGHT;
+    
+    return (
+        <div 
+            ref={containerRef}
+            style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: '12px',
+                padding: '4px',
+                position: 'relative',
+                height: '100%',
+                overflowY: 'auto'
+            }}
+        >
+            {/* Spacer for items before visible range */}
+            {visibleRange.start > 0 && (
+                <div style={{ gridColumn: '1 / -1', height: startOffset }} />
+            )}
+            
+            {visibleImages.map((img, localIdx) => {
+                const filteredIdx = visibleRange.start + localIdx;
+                const originalIdx = filteredToOriginal.get(filteredIdx);
+                const isCurrent = originalIdx !== undefined && originalIdx === currentIndex;
+                const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
+                
+                return (
+                    <div
+                        key={img}
+                        ref={isCurrent ? activeRef : null}
+                        onClick={(e) => {
+                            if (e.ctrlKey || e.metaKey) {
+                                // Multi-select
+                                if (onToggleImageSelection) {
+                                    onToggleImageSelection(img);
+                                }
+                            } else {
+                                // Single select
+                                if (originalIdx !== undefined && originalIdx >= 0) {
+                                    setIndex(originalIdx);
+                                }
+                            }
+                        }}
+                        onMouseEnter={(e) => {
+                            if (setHoveredImageIndex) {
+                                setHoveredImageIndex(filteredIdx);
+                            }
+                            if (onImagePreview && annotationCache && annotationCache.current) {
+                                const anns = annotationCache.current[img] || [];
+                                onImagePreview({
+                                    path: img,
+                                    annotations: anns,
+                                    position: { x: e.clientX, y: e.clientY }
+                                });
+                            }
+                        }}
+                        onMouseLeave={() => {
+                            if (setHoveredImageIndex) {
+                                setHoveredImageIndex(null);
+                            }
+                            if (onImagePreview) {
+                                onImagePreview(null);
+                            }
+                        }}
+                        style={{
+                            position: 'relative',
+                            cursor: 'pointer',
+                            background: isCurrent 
+                                ? 'rgba(0, 224, 255, 0.15)' 
+                                : selectedImages.has(img)
+                                ? 'rgba(0, 224, 255, 0.1)'
+                                : 'rgba(255, 255, 255, 0.05)',
+                            border: isCurrent 
+                                ? '2px solid #00e0ff' 
+                                : selectedImages.has(img)
+                                ? '2px solid rgba(0, 224, 255, 0.5)'
+                                : '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            transition: 'all 0.2s ease',
+                            aspectRatio: '1'
+                        }}
+                    >
+                        <img
+                            src={img}
+                            alt={getName(img)}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block'
+                            }}
+                            loading="lazy"
+                        />
+                        {selectedImages.has(img) && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '4px',
+                                left: '4px',
+                                width: '20px',
+                                height: '20px',
+                                background: 'rgba(0, 224, 255, 0.9)',
+                                border: '2px solid #00e0ff',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 5
+                            }}>
+                                <CheckCircle size={14} style={{ color: '#000' }} />
+                            </div>
+                        )}
+                        {hasAnnotations && annotationCache && annotationCache.current && annotationCache.current[img] && Array.isArray(annotationCache.current[img]) && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                background: 'rgba(0, 224, 255, 0.8)',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                                zIndex: 4
+                            }}>
+                                {annotationCache.current[img].length}
+                            </div>
+                        )}
+                        {isCurrent && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(0, 224, 255, 0.9)',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                padding: '4px',
+                                textAlign: 'center',
+                                fontWeight: 'bold'
+                            }}>
+                                Current
+                            </div>
+                        )}
+                        {/* Quick Actions on Hover */}
+                        {hoveredImageIndex === filteredIdx && !isCurrent && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '4px',
+                                right: '4px',
+                                display: 'flex',
+                                gap: '4px',
+                                zIndex: 10
+                            }}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (originalIdx !== undefined && originalIdx >= 0) {
+                                            setIndex(originalIdx);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: '4px',
+                                        background: 'rgba(0, 224, 255, 0.9)',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Open image"
+                                >
+                                    <Eye size={12} />
+                                </button>
+                                {onDeleteImage && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (window.confirm(`Delete ${getName(img)}?`)) {
+                                                onDeleteImage(img, originalIdx);
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '4px',
+                                            background: 'rgba(255, 68, 68, 0.9)',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                        title="Delete image"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+            
+            {/* Spacer for items after visible range */}
+            {visibleRange.end < images.length && (
+                <div style={{ 
+                    gridColumn: '1 / -1', 
+                    height: Math.ceil((images.length - visibleRange.end) / ITEMS_PER_ROW) * ITEM_HEIGHT 
+                }} />
+            )}
+        </div>
+    );
+}
+
+// Virtualized Image List Component for performance
+function VirtualizedImageList({ images, filteredToOriginal, currentIndex, setIndex, annotatedImages, activeRef, getName, hoveredImageIndex, setHoveredImageIndex, onDeleteImage, selectedImages = new Set(), onToggleImageSelection }) {
+    const containerRef = useRef(null);
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+    const ITEM_HEIGHT = 40; // Height of each list item
+    
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        
+        const handleScroll = () => {
+            const scrollTop = container.scrollTop;
+            const containerHeight = container.clientHeight;
+            const start = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 5); // Buffer
+            const end = Math.min(images.length, Math.ceil((scrollTop + containerHeight) / ITEM_HEIGHT) + 5); // Buffer
+            
+            setVisibleRange({ start, end });
+        };
+        
+        container.addEventListener('scroll', handleScroll);
+        handleScroll(); // Initial calculation
+        
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [images.length]);
+    
+    const visibleImages = images.slice(visibleRange.start, visibleRange.end);
+    const startOffset = visibleRange.start * ITEM_HEIGHT;
+    
+    return (
+        <div 
+            ref={containerRef}
+            style={{
+                position: 'relative',
+                height: '100%',
+                overflowY: 'auto'
+            }}
+        >
+            {/* Spacer for items before visible range */}
+            {visibleRange.start > 0 && (
+                <div style={{ height: startOffset }} />
+            )}
+            
+            {visibleImages.map((img, localIdx) => {
+                const filteredIdx = visibleRange.start + localIdx;
+                const originalIdx = filteredToOriginal.get(filteredIdx);
+                const isCurrent = originalIdx !== undefined && originalIdx === currentIndex;
+                const hasAnnotations = annotatedImages ? annotatedImages.has(img) : false;
+                
+                return (
+                    <div
+                        key={img}
+                        ref={isCurrent ? activeRef : null}
+                        onClick={() => {
+                            if (originalIdx !== undefined && originalIdx >= 0) {
+                                setIndex(originalIdx);
+                            }
+                        }}
+                        style={{
+                            padding: '8px',
+                            background: isCurrent ? 'rgba(0, 224, 255, 0.1)' : 'transparent',
+                            borderLeft: isCurrent ? '3px solid #00e0ff' : 'none',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            color: isCurrent ? '#00e0ff' : '#aaa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            height: ITEM_HEIGHT,
+                            boxSizing: 'border-box'
+                        }}
+                        onMouseEnter={() => setHoveredImageIndex && setHoveredImageIndex(filteredIdx)}
+                        onMouseLeave={() => setHoveredImageIndex && setHoveredImageIndex(null)}
+                    >
+                        {selectedImages.has(img) && (
+                            <div style={{
+                                width: '16px',
+                                height: '16px',
+                                background: 'rgba(0, 224, 255, 0.3)',
+                                border: '2px solid #00e0ff',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                            }}>
+                                <CheckCircle size={12} style={{ color: '#00e0ff' }} />
+                            </div>
+                        )}
+                        <ImageIcon size={16} style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {getName(img)}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {hasAnnotations && (
+                                <CheckCircle size={14} style={{ color: '#00e0ff', flexShrink: 0 }} />
+                            )}
+                            {hoveredImageIndex === filteredIdx && !isCurrent && onDeleteImage && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (window.confirm(`Delete ${getName(img)}?`)) {
+                                            onDeleteImage(img, originalIdx);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: '2px 4px',
+                                        background: 'rgba(255, 68, 68, 0.2)',
+                                        border: '1px solid rgba(255, 68, 68, 0.5)',
+                                        borderRadius: '4px',
+                                        color: '#ff4444',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    title="Delete image"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+            
+            {/* Spacer for items after visible range */}
+            {visibleRange.end < images.length && (
+                <div style={{ height: (images.length - visibleRange.end) * ITEM_HEIGHT }} />
             )}
         </div>
     );

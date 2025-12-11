@@ -1,8 +1,10 @@
 # 🦙 Lama Worlds Annotation Studio
 
-A modern and powerful image annotation tool for YOLO datasets, with an elegant user interface and advanced features including Vision LLM integration.
+A modern and powerful image annotation tool for YOLO datasets, with an elegant user interface and advanced features.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+> 📖 **For complete documentation, see [docs/README.md](docs/README.md)**
+
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 

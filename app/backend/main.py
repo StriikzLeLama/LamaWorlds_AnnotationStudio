@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body, UploadFile, File
+from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
@@ -32,12 +32,12 @@ if _backend_dir not in sys.path:
     sys.path.insert(0, _backend_dir)
 
 try:
-    from backend.models import DatasetPath, AnnotationData, ClassUpdate
+    from backend.models import DatasetPath, AnnotationData, ClassUpdate, MergeDatasetsRequest, ExportProjectRequest, ImportProjectRequest
     from backend.yolo_handler import parse_yolo_file, save_yolo_file
 except ImportError:
     # If running as script directly (packaged mode), use direct imports
     try:
-        from models import DatasetPath, AnnotationData, ClassUpdate
+        from models import DatasetPath, AnnotationData, ClassUpdate, MergeDatasetsRequest, ExportProjectRequest, ImportProjectRequest
         from yolo_handler import parse_yolo_file, save_yolo_file
     except ImportError as e:
         print(f"[ERROR] Import error: {e}")
@@ -68,7 +68,11 @@ def read_root():
     }
 
 @app.post("/load_dataset")
-def load_dataset(data: DatasetPath):
+def load_dataset(data: DatasetPath, page: int = Query(0, ge=0), page_size: int = Query(999999, ge=1)):
+    """
+    Load dataset with pagination support for large datasets.
+    Returns total count and a page of images.
+    """
     path = data.path
     if not path or not isinstance(path, str):
         raise HTTPException(status_code=400, detail="Invalid path provided")
@@ -84,12 +88,24 @@ def load_dataset(data: DatasetPath):
         images_dir = path
         labels_dir = path
     
+    # Use recursive glob for better performance on large directories
     # List images - use case-insensitive search to avoid duplicates
     exts = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']
     images = set()  # Use set to automatically remove duplicates
-    for ext in exts:
-        found = glob.glob(os.path.join(images_dir, ext))
-        images.update(found)
+    
+    # Use recursive glob if available (Python 3.5+)
+    import glob
+    try:
+        # Try recursive pattern first (faster for large directories)
+        for ext in exts:
+            pattern = os.path.join(images_dir, '**', ext)
+            found = glob.glob(pattern, recursive=True)
+            images.update(found)
+    except:
+        # Fallback to non-recursive
+        for ext in exts:
+            found = glob.glob(os.path.join(images_dir, ext))
+            images.update(found)
     
     # Convert to absolute paths and remove duplicates (case-insensitive on Windows)
     image_list = []
@@ -103,7 +119,22 @@ def load_dataset(data: DatasetPath):
             image_list.append(abs_path)
     
     image_list.sort()  # Sort for consistent ordering
-    return {"images": image_list, "images_dir": images_dir, "labels_dir": labels_dir}
+    
+    # Pagination
+    total_count = len(image_list)
+    start_idx = page * page_size
+    end_idx = start_idx + page_size
+    paginated_images = image_list[start_idx:end_idx]
+    
+    return {
+        "images": paginated_images,
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "has_more": end_idx < total_count,
+        "images_dir": images_dir,
+        "labels_dir": labels_dir
+    }
 
 @app.post("/load_annotation")
 def load_annotation(dataset_path: str = Body(...), image_path: str = Body(...)):
@@ -489,6 +520,226 @@ async def import_yaml_classes(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error importing YAML: {str(e)}")
 
+@app.post("/merge_datasets")
+def merge_datasets_endpoint(data: MergeDatasetsRequest):
+    """
+    Merge multiple datasets into one.
+    - Copies all images
+    - Merges classes from all datasets (YAML files)
+    - Updates annotation class IDs to match merged classes
+    - Creates a unified dataset structure
+    """
+    try:
+        import shutil
+        from collections import OrderedDict
+        
+        if len(data.dataset_paths) < 2:
+            raise HTTPException(status_code=400, detail="At least 2 datasets are required for merging")
+        
+        if not os.path.exists(data.output_path):
+            os.makedirs(data.output_path, exist_ok=True)
+        
+        # Create output directory structure
+        output_images_dir = os.path.join(data.output_path, "images")
+        output_labels_dir = os.path.join(data.output_path, "labels")
+        os.makedirs(output_images_dir, exist_ok=True)
+        os.makedirs(output_labels_dir, exist_ok=True)
+        
+        # Step 1: Collect all classes from all datasets
+        all_classes = OrderedDict()  # name_lower -> (id, color, original_name)
+        class_id_counter = 0
+        dataset_class_mappings = []  # For each dataset, store old_id -> new_id mapping
+        
+        colors = ["#00e0ff", "#56b0ff", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a8e6cf", "#ff8b94", "#c7ceea"]
+        
+        for dataset_idx, dataset_path in enumerate(data.dataset_paths):
+            if not os.path.exists(dataset_path):
+                raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_path}")
+            
+            # Load classes from this dataset
+            classes_file = os.path.join(dataset_path, "classes.txt")
+            class_mapping = {}  # old_id -> new_id for this dataset
+            
+            if os.path.exists(classes_file):
+                with open(classes_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                for old_id, line in enumerate(lines):
+                    class_name = line.strip()
+                    if not class_name:
+                        continue
+                    
+                    # Check if class already exists (case-insensitive)
+                    class_name_lower = class_name.lower()
+                    if class_name_lower in all_classes:
+                        # Use existing class ID
+                        new_id, _, _ = all_classes[class_name_lower]
+                        class_mapping[old_id] = new_id
+                    else:
+                        # Create new class
+                        new_id = class_id_counter
+                        color = colors[new_id % len(colors)]
+                        all_classes[class_name_lower] = (new_id, color, class_name)  # Preserve original name
+                        class_mapping[old_id] = new_id
+                        class_id_counter += 1
+            else:
+                # Try to load from YAML file
+                yaml_files = glob.glob(os.path.join(dataset_path, "*.yaml")) + glob.glob(os.path.join(dataset_path, "*.yml"))
+                if yaml_files:
+                    yaml_file = yaml_files[0]
+                    try:
+                        with open(yaml_file, 'r', encoding='utf-8') as f:
+                            yaml_data = yaml.safe_load(f)
+                        if 'names' in yaml_data:
+                            names = yaml_data['names']
+                            if isinstance(names, list):
+                                for old_id, name in enumerate(names):
+                                    if not name:
+                                        continue
+                                    class_name = str(name).strip()
+                                    class_name_lower = class_name.lower()
+                                    if class_name_lower in all_classes:
+                                        new_id, _, _ = all_classes[class_name_lower]
+                                        class_mapping[old_id] = new_id
+                                    else:
+                                        new_id = class_id_counter
+                                        color = colors[new_id % len(colors)]
+                                        all_classes[class_name_lower] = (new_id, color, class_name)  # Preserve original name
+                                        class_mapping[old_id] = new_id
+                                        class_id_counter += 1
+                            elif isinstance(names, dict):
+                                for old_id_str, name in names.items():
+                                    try:
+                                        old_id = int(old_id_str)
+                                        class_name = str(name).strip()
+                                        class_name_lower = class_name.lower()
+                                        if class_name_lower in all_classes:
+                                            new_id, _, _ = all_classes[class_name_lower]
+                                            class_mapping[old_id] = new_id
+                                        else:
+                                            new_id = class_id_counter
+                                            color = colors[new_id % len(colors)]
+                                            all_classes[class_name_lower] = (new_id, color, class_name)  # Preserve original name
+                                            class_mapping[old_id] = new_id
+                                            class_id_counter += 1
+                                    except ValueError:
+                                        continue
+                    except Exception as e:
+                        print(f"Warning: Could not load YAML from {yaml_file}: {e}")
+            
+            dataset_class_mappings.append(class_mapping)
+        
+        # Step 2: Create merged classes.txt and data.yaml
+        classes_list = sorted(all_classes.items(), key=lambda x: x[1][0])  # Sort by new_id
+        classes_txt_path = os.path.join(data.output_path, "classes.txt")
+        with open(classes_txt_path, 'w', encoding='utf-8') as f:
+            for class_name_lower, (new_id, color, original_name) in classes_list:
+                # Use original name with preserved case
+                f.write(f"{original_name}\n")
+        
+        # Create merged data.yaml
+        yaml_data = {
+            'path': data.output_path,
+            'train': 'images',
+            'val': 'images',
+            'names': {new_id: original_name for class_name_lower, (new_id, _, original_name) in classes_list}
+        }
+        yaml_path = os.path.join(data.output_path, "data.yaml")
+        with open(yaml_path, 'w', encoding='utf-8') as f:
+            yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True)
+        
+        # Step 3: Copy images and update annotations
+        total_images = 0
+        total_annotations = 0
+        image_counter = {}  # Track image name conflicts
+        
+        for dataset_idx, dataset_path in enumerate(data.dataset_paths):
+            class_mapping = dataset_class_mappings[dataset_idx]
+            
+            # Determine images and labels directories
+            images_dir = os.path.join(dataset_path, "images")
+            labels_dir = os.path.join(dataset_path, "labels")
+            
+            if not os.path.exists(images_dir):
+                images_dir = dataset_path
+            if not os.path.exists(labels_dir):
+                labels_dir = dataset_path
+            
+            # Find all images
+            exts = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']
+            images = set()
+            for ext in exts:
+                pattern = os.path.join(images_dir, '**', ext)
+                try:
+                    found = glob.glob(pattern, recursive=True)
+                    images.update(found)
+                except:
+                    found = glob.glob(os.path.join(images_dir, ext))
+                    images.update(found)
+            
+            # Process each image
+            for image_path in images:
+                image_name = os.path.basename(image_path)
+                base_name = os.path.splitext(image_name)[0]
+                
+                # Handle name conflicts
+                if image_name in image_counter:
+                    image_counter[image_name] += 1
+                    new_image_name = f"{base_name}_{image_counter[image_name]}{os.path.splitext(image_name)[1]}"
+                    new_base_name = f"{base_name}_{image_counter[image_name]}"
+                else:
+                    image_counter[image_name] = 0
+                    new_image_name = image_name
+                    new_base_name = base_name
+                
+                # Copy image
+                output_image_path = os.path.join(output_images_dir, new_image_name)
+                if not os.path.exists(output_image_path):
+                    shutil.copy2(image_path, output_image_path)
+                    total_images += 1
+                
+                # Process annotation file
+                label_file = os.path.join(labels_dir, base_name + ".txt")
+                if os.path.exists(label_file):
+                    boxes = parse_yolo_file(label_file)
+                    if boxes:
+                        # Update class IDs
+                        updated_boxes = []
+                        for box in boxes:
+                            old_class_id = int(box.get('class_id', 0))
+                            new_class_id = class_mapping.get(old_class_id, old_class_id)
+                            
+                            updated_boxes.append({
+                                'class_id': new_class_id,
+                                'x': box.get('x', 0),
+                                'y': box.get('y', 0),
+                                'width': box.get('width', 0),
+                                'height': box.get('height', 0),
+                                'confidence': box.get('confidence', 1.0)
+                            })
+                            total_annotations += 1
+                        
+                        # Save updated annotation
+                        output_label_path = os.path.join(output_labels_dir, new_base_name + ".txt")
+                        save_yolo_file(output_label_path, updated_boxes)
+        
+        return {
+            "status": "success",
+            "output_path": data.output_path,
+            "total_datasets": len(data.dataset_paths),
+            "total_images": total_images,
+            "total_annotations": total_annotations,
+            "total_classes": len(all_classes),
+            "classes": [{"id": new_id, "name": original_name, "color": color} 
+                       for class_name_lower, (new_id, color, original_name) in classes_list]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error merging datasets: {str(e)}")
+
 # ... existing code ...
 try:
     from backend.exporter import export_coco, export_voc
@@ -600,6 +851,95 @@ def export_report_endpoint(data: ReportRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
+@app.post("/export_project")
+def export_project(data: ExportProjectRequest):
+    """
+    Export a complete project (images, annotations, classes) to a new location
+    """
+    try:
+        import shutil
+        
+        if not os.path.exists(data.dataset_path):
+            raise HTTPException(status_code=404, detail="Dataset path not found")
+        
+        if not os.path.exists(data.output_path):
+            os.makedirs(data.output_path, exist_ok=True)
+        
+        # Copy images directory
+        src_images = os.path.join(data.dataset_path, "images")
+        dst_images = os.path.join(data.output_path, "images")
+        if os.path.exists(src_images):
+            if os.path.exists(dst_images):
+                shutil.rmtree(dst_images)
+            shutil.copytree(src_images, dst_images)
+        else:
+            # Flat structure - copy images from root
+            os.makedirs(dst_images, exist_ok=True)
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.JPG', '*.JPEG', '*.PNG', '*.BMP']:
+                for img_file in glob.glob(os.path.join(data.dataset_path, ext)):
+                    shutil.copy2(img_file, dst_images)
+        
+        # Copy labels directory
+        src_labels = os.path.join(data.dataset_path, "labels")
+        dst_labels = os.path.join(data.output_path, "labels")
+        if os.path.exists(src_labels):
+            if os.path.exists(dst_labels):
+                shutil.rmtree(dst_labels)
+            shutil.copytree(src_labels, dst_labels)
+        else:
+            os.makedirs(dst_labels, exist_ok=True)
+            for ext in ['*.txt']:
+                for label_file in glob.glob(os.path.join(data.dataset_path, ext)):
+                    shutil.copy2(label_file, dst_labels)
+        
+        # Copy classes.txt
+        src_classes = os.path.join(data.dataset_path, "classes.txt")
+        dst_classes = os.path.join(data.output_path, "classes.txt")
+        if os.path.exists(src_classes):
+            shutil.copy2(src_classes, dst_classes)
+        
+        # Copy data.yaml if exists
+        for yaml_file in glob.glob(os.path.join(data.dataset_path, "*.yaml")) + glob.glob(os.path.join(data.dataset_path, "*.yml")):
+            shutil.copy2(yaml_file, data.output_path)
+        
+        return {
+            "status": "success",
+            "output_path": data.output_path,
+            "message": "Project exported successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting project: {str(e)}")
+
+@app.post("/import_project")
+def import_project(data: ImportProjectRequest):
+    """
+    Import a complete project - returns the dataset path
+    """
+    try:
+        if not os.path.exists(data.project_path):
+            raise HTTPException(status_code=404, detail="Project path not found")
+        
+        # Verify it's a valid project (has images or classes.txt)
+        has_images = False
+        images_dir = os.path.join(data.project_path, "images")
+        if os.path.exists(images_dir) and len(os.listdir(images_dir)) > 0:
+            has_images = True
+        elif any(f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')) for f in os.listdir(data.project_path) if os.path.isfile(os.path.join(data.project_path, f))):
+            has_images = True
+        
+        if not has_images:
+            raise HTTPException(status_code=400, detail="Project path does not contain images")
+        
+        return {
+            "status": "success",
+            "dataset_path": data.project_path,
+            "message": "Project imported successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error importing project: {str(e)}")
 
 @app.post("/delete_image")
 def delete_image(dataset_path: str = Body(...), image_path: str = Body(...)):

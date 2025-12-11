@@ -1,3 +1,21 @@
+/**
+ * @fileoverview AnalyticsPanel Component - Advanced Analytics and Visualizations
+ * 
+ * This component provides advanced analytics with:
+ * - Class distribution charts
+ * - Annotation statistics
+ * - Dataset metrics
+ * - Visual charts and graphs
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Array<string>} props.images - Array of image file paths
+ * @param {Array<Object>} props.annotations - Current image annotations
+ * @param {Array<Object>} props.classes - Annotation classes
+ * @param {Set<string>} props.annotatedImages - Set of annotated image paths
+ * @returns {JSX.Element} The rendered analytics panel component
+ */
+
 import React, { useMemo } from 'react';
 import { BarChart3, TrendingUp, PieChart, Activity } from 'lucide-react';
 import CollapsiblePanel from './CollapsiblePanel';
@@ -53,7 +71,15 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
     
     if (!stats) {
         return (
-            <CollapsiblePanel title="Analytics" icon={BarChart3} containerStyle={{ margin: '10px' }}>
+            <CollapsiblePanel 
+                title="Analytics" 
+                icon={BarChart3} 
+                containerStyle={{ 
+                    margin: '10px',
+                    background: 'rgba(20, 20, 35, 0.2)',
+                    backdropFilter: 'blur(5px)'
+                }}
+            >
                 <div style={{ color: '#aaa', fontSize: '0.85rem' }}>No data available</div>
             </CollapsiblePanel>
         );
@@ -84,7 +110,16 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
         <CollapsiblePanel 
             title="Analytics" 
             icon={BarChart3}
-            containerStyle={{ margin: '10px', maxHeight: '400px', overflowY: 'auto' }}
+            containerStyle={{ 
+                margin: '10px', 
+                maxHeight: '400px', 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                background: 'rgba(20, 20, 35, 0.2)',
+                backdropFilter: 'blur(5px)',
+                width: '100%',
+                boxSizing: 'border-box'
+            }}
         >
             {/* Overview Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>

@@ -1,3 +1,22 @@
+/**
+ * @fileoverview StatsPanel Component - Statistics Display
+ * 
+ * This component displays dataset and image statistics:
+ * - Dataset progress (annotated vs total images)
+ * - Current image annotation count
+ * - Annotations by class for current image
+ * - Progress bars and visual indicators
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {Array<string>} props.images - Array of image file paths
+ * @param {Array<Object>} props.annotations - Current image annotations
+ * @param {Array<Object>} props.classes - Annotation classes
+ * @param {string} props.datasetPath - Current dataset path
+ * @param {Set<string>} props.annotatedImages - Set of annotated image paths
+ * @returns {JSX.Element} The rendered statistics panel component
+ */
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3, CheckCircle, Circle, Image as ImageIcon, TrendingUp, Database } from 'lucide-react';
 import CollapsiblePanel from './CollapsiblePanel';
@@ -73,11 +92,34 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
         <CollapsiblePanel 
             title="Statistics" 
             icon={BarChart3}
-            containerStyle={{ maxHeight: '400px', overflowY: 'auto' }}
+            containerStyle={{ 
+                maxHeight: '400px', 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                background: 'rgba(20, 20, 35, 0.2)',
+                backdropFilter: 'blur(5px)',
+                width: '100%',
+                boxSizing: 'border-box'
+            }}
         >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px',
+                width: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+            }}>
                 {/* Dataset Progress */}
-                <div style={{ padding: '10px', background: 'rgba(0, 224, 255, 0.05)', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.2)' }}>
+                <div style={{ 
+                    padding: '10px', 
+                    background: 'rgba(0, 224, 255, 0.05)', 
+                    borderRadius: '6px', 
+                    border: '1px solid rgba(0, 224, 255, 0.2)',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden'
+                }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                         <Database size={14} style={{ color: '#00e0ff' }} />
                         <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>Dataset Progress</span>
@@ -87,15 +129,6 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                         <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>
                             {currentAnnotatedCount} / {totalImages}
                         </span>
-                    </div>
-                    <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
-                        <div style={{ 
-                            width: `${progress}%`, 
-                            height: '100%', 
-                            background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
-                            transition: 'width 0.3s ease',
-                            boxShadow: '0 0 10px rgba(0, 224, 255, 0.5)'
-                        }}></div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#666' }}>
                         <span>{progress}% Complete</span>
@@ -139,7 +172,11 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                                         marginBottom: '4px',
                                         borderRadius: '4px',
                                         background: 'rgba(255, 255, 255, 0.02)',
-                                        border: `1px solid ${cls.color}33`
+                                        border: `1px solid ${cls.color}33`,
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        overflow: 'hidden',
+                                        minWidth: 0
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                                             <div style={{ 
@@ -149,7 +186,14 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                                                 background: cls.color,
                                                 boxShadow: `0 0 6px ${cls.color}`
                                             }}></div>
-                                            <span style={{ fontSize: '0.8rem', flex: 1 }}>{cls.name}</span>
+                                            <span style={{ 
+                                                fontSize: '0.8rem', 
+                                                flex: 1, 
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                minWidth: 0
+                                            }}>{cls.name}</span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <div style={{ 

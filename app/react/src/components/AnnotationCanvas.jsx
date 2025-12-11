@@ -1,3 +1,18 @@
+/**
+ * @fileoverview AnnotationCanvas Component - Main Canvas for Drawing Annotations
+ * 
+ * This component provides the main annotation canvas with:
+ * - Image display with zoom, pan, rotate, flip
+ * - Drawing rectangular annotations (YOLO format)
+ * - Selecting and editing annotations
+ * - Multi-selection support
+ * - Keyboard shortcuts
+ * - Grid snapping
+ * - Measurements display
+ * 
+ * @component
+ */
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Transformer, Line, Text } from 'react-konva';
 import useImage from 'use-image';
@@ -6,6 +21,16 @@ import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize2, Minimize2, FlipHorizon
 import { useSettings } from '../hooks/useSettings';
 import MiniMap from './MiniMap';
 
+/**
+ * CanvasImage Component - Memoized image component for performance
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.src - Image source URL
+ * @param {number} props.rotation - Image rotation in degrees
+ * @param {Object} props.flip - Flip configuration {horizontal: boolean, vertical: boolean}
+ * @param {Function} props.onImageLoad - Callback when image loads
+ * @returns {JSX.Element|null} The rendered image component
+ */
 const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false, vertical: false }, onImageLoad }) => {
     const [image] = useImage(src);
     const onImageLoadRef = React.useRef(onImageLoad);
@@ -41,6 +66,28 @@ const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false,
     );
 });
 
+/**
+ * AnnotationCanvas Component - Main annotation canvas
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.imageUrl - URL of the current image
+ * @param {Array<Object>} props.annotations - Array of annotation objects
+ * @param {Function} props.onChange - Callback when annotations change
+ * @param {number} props.selectedClassId - Currently selected class ID
+ * @param {Array<Object>} props.classes - Array of annotation classes
+ * @param {string|null} props.selectedId - Currently selected annotation ID
+ * @param {Function} props.onSelect - Function to select annotation
+ * @param {Set<string>} props.selectedIds - Set of selected annotation IDs
+ * @param {Function} props.onSelectMultiple - Function to select multiple annotations
+ * @param {boolean} props.showAnnotations - Show/hide annotations
+ * @param {boolean} props.onZoomToSelection - Zoom to selected annotation
+ * @param {boolean} props.isFullscreen - Fullscreen mode
+ * @param {Function} props.onToggleFullscreen - Function to toggle fullscreen
+ * @param {boolean} props.quickDrawMode - Quick draw mode enabled
+ * @param {boolean} props.showMeasurements - Show measurements enabled
+ * @param {Object} props.imageDimensions - Image dimensions {width, height}
+ * @returns {JSX.Element} The rendered canvas component
+ */
 const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, classes, selectedId, onSelect, selectedIds, onSelectMultiple, showAnnotations = true, onZoomToSelection, isFullscreen = false, onToggleFullscreen, quickDrawMode = false, showMeasurements = false, imageDimensions: propImageDimensions }) => {
     // Settings
     const { settings, getSetting } = useSettings();

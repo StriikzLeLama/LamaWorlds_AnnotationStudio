@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { X, Sparkles, Eye, CheckCircle, RefreshCw, Filter, Loader, TrendingUp, AlertCircle, CheckCircle2, XCircle, Clock, Image as ImageIcon, Settings } from 'lucide-react';
 import axios from 'axios';
 
@@ -13,6 +13,8 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
     const [ggufModelPath, setGgufModelPath] = useState('');
     const [confidenceThreshold, setConfidenceThreshold] = useState(0.7);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
+    const cancelRef = useRef(false);
     const [progress, setProgress] = useState({ current: 0, total: 0, currentImage: '', percentage: 0 });
     const [results, setResults] = useState(null);
     const [mode, setMode] = useState('verify');
@@ -76,6 +78,8 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
         }
 
         setIsProcessing(true);
+        setIsCancelling(false);
+        cancelRef.current = false;
         setProgress({ current: 0, total: filteredImages.length, currentImage: '', percentage: 0 });
         setResults(null);
 
@@ -83,52 +87,137 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                       : mode === 'annotate' ? '/vision_llm/annotate_all'
                       : '/vision_llm/modify_annotations';
 
+        // Process in batches for better progress tracking
+        const BATCH_SIZE = 10; // Process 10 images at a time
+        const batches = [];
+        for (let i = 0; i < filteredImages.length; i += BATCH_SIZE) {
+            batches.push(filteredImages.slice(i, i + BATCH_SIZE));
+        }
+
+        let allResults = {
+            total_count: filteredImages.length,
+            annotated_count: 0,
+            annotations_count: 0,
+            annotations: [],
+            image_results: [],
+            overall_score: 0,
+            verified_count: 0
+        };
+
         try {
-            const requestData = {
-                images: filteredImages,
-                annotations: mode !== 'annotate' ? annotations : [],
-                classes: classes,
-                dataset_path: datasetPath,
-                api_provider: apiProvider,
-                api_key: apiKey,
-                api_endpoint: apiEndpoint,
-                model: model,
-                gguf_model_path: ggufModelPath,
-                confidence_threshold: confidenceThreshold,
-                mode: mode,
-                auto_apply: autoApply
-            };
-
-            // Use a custom axios instance with progress tracking
-            const response = await api.post(endpoint, requestData, {
-                onUploadProgress: (progressEvent) => {
-                    if (progressEvent.total) {
-                        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        setProgress(prev => ({
-                            ...prev,
-                            percentage: Math.min(percent, 95) // Cap at 95% until complete
-                        }));
-                    }
+            for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+                // Check for cancellation
+                if (cancelRef.current) {
+                    console.log('Processing cancelled by user');
+                    break;
                 }
-            });
+                
+                const batch = batches[batchIdx];
+                
+                // Update progress with current batch info
+                const currentImageInBatch = batch[0];
+                setProgress(prev => ({
+                    current: batchIdx * BATCH_SIZE,
+                    total: filteredImages.length,
+                    currentImage: currentImageInBatch,
+                    percentage: Math.round(((batchIdx * BATCH_SIZE) / filteredImages.length) * 100)
+                }));
 
-            setProgress(prev => ({ ...prev, percentage: 100 }));
-            setResults(response.data);
-            
-            if (autoApply && response.data.annotations) {
-                if (onUpdateAnnotations) {
-                    response.data.annotations.forEach((annData) => {
-                        if (annData.image_path && annData.annotations) {
-                            onUpdateAnnotations(annData.image_path, annData.annotations);
-                        }
+                const requestData = {
+                    images: batch,
+                    annotations: mode !== 'annotate' ? annotations : [],
+                    classes: classes,
+                    dataset_path: datasetPath,
+                    api_provider: apiProvider,
+                    api_key: apiKey,
+                    api_endpoint: apiEndpoint,
+                    model: model,
+                    gguf_model_path: ggufModelPath,
+                    confidence_threshold: confidenceThreshold,
+                    mode: mode,
+                    auto_apply: false // Don't auto-apply during batch processing
+                };
+
+                try {
+                    const response = await api.post(endpoint, requestData, {
+                        timeout: 300000 // 5 minutes per batch
                     });
+
+                    // Merge results
+                    if (response.data) {
+                        if (response.data.annotations) {
+                            allResults.annotations.push(...response.data.annotations);
+                            allResults.annotated_count += response.data.annotated_count || 0;
+                            allResults.annotations_count += response.data.annotations_count || 0;
+                        }
+                        if (response.data.image_results) {
+                            allResults.image_results.push(...response.data.image_results);
+                        }
+                        if (response.data.overall_score !== undefined) {
+                            // Calculate weighted average
+                            const prevScore = allResults.overall_score || 0;
+                            const prevCount = allResults.verified_count || 0;
+                            const newScore = response.data.overall_score || 0;
+                            const newCount = response.data.verified_count || 0;
+                            if (prevCount + newCount > 0) {
+                                allResults.overall_score = (prevScore * prevCount + newScore * newCount) / (prevCount + newCount);
+                            }
+                        }
+                        allResults.verified_count += response.data.verified_count || 0;
+                    }
+
+                    // Update progress after batch
+                    setProgress(prev => ({
+                        current: Math.min((batchIdx + 1) * BATCH_SIZE, filteredImages.length),
+                        total: filteredImages.length,
+                        currentImage: batch[batch.length - 1],
+                        percentage: Math.round(((batchIdx + 1) * BATCH_SIZE / filteredImages.length) * 100)
+                    }));
+
+                    // Small delay to allow UI to update
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (batchError) {
+                    console.error(`Error processing batch ${batchIdx + 1}/${batches.length}:`, batchError);
+                    // Continue with next batch instead of failing completely
+                    continue;
                 }
+            }
+
+            // Final progress update
+            setProgress(prev => ({
+                current: filteredImages.length,
+                total: filteredImages.length,
+                currentImage: '',
+                percentage: 100
+            }));
+
+            setResults(allResults);
+            
+            // Auto-apply if requested
+            if (autoApply && allResults.annotations && onUpdateAnnotations) {
+                allResults.annotations.forEach((annData) => {
+                    if (annData.image_path && annData.annotations) {
+                        onUpdateAnnotations(annData.image_path, annData.annotations);
+                    }
+                });
+                alert(`Applied annotations to ${allResults.annotations.length} images`);
             }
         } catch (error) {
             console.error('Vision LLM error:', error);
-            alert('Error: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
+            if (!cancelRef.current) {
+                alert('Error: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
+            }
         } finally {
             setIsProcessing(false);
+            setIsCancelling(false);
+            cancelRef.current = false;
+        }
+    };
+
+    const handleCancel = () => {
+        if (isProcessing) {
+            cancelRef.current = true;
+            setIsCancelling(true);
         }
     };
 
@@ -231,26 +320,67 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                         <div style={{ fontSize: '1.2rem', color: '#00e0ff', marginBottom: '10px', fontWeight: 'bold' }}>
                             Processing Images...
                         </div>
-                        <div style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '20px' }}>
-                            {progress.current} / {progress.total} images
+                        <div style={{ fontSize: '1rem', color: '#aaa', marginBottom: '15px' }}>
+                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{progress.current}</span> / {progress.total} images
+                            {progress.current > 0 && (
+                                <span style={{ marginLeft: '10px', color: '#56b0ff' }}>
+                                    ({Math.round((progress.current / progress.total) * 100)}%)
+                                </span>
+                            )}
                         </div>
-                        {progress.currentImage && (
-                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '20px', maxWidth: '400px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                Current: {progress.currentImage.split(/[/\\]/).pop()}
-                            </div>
-                        )}
-                        <div style={{ width: '400px', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+                        <div style={{ width: '400px', height: '20px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px', position: 'relative' }}>
                             <div style={{
-                                width: `${progress.percentage}%`,
+                                width: `${Math.min(progress.percentage, 100)}%`,
                                 height: '100%',
                                 background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
                                 transition: 'width 0.3s ease',
-                                boxShadow: '0 0 10px rgba(0, 224, 255, 0.5)'
-                            }}></div>
+                                boxShadow: '0 0 10px rgba(0, 224, 255, 0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                            }}>
+                                {progress.percentage > 5 && `${progress.percentage}%`}
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                            {progress.percentage}% complete
-                        </div>
+                        {progress.currentImage && (
+                            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '10px' }}>
+                                    Current Image ({progress.current} of {progress.total}):
+                                </p>
+                                <div style={{ 
+                                    maxWidth: '300px', 
+                                    maxHeight: '200px', 
+                                    margin: '0 auto',
+                                    borderRadius: '8px', 
+                                    border: '2px solid #00e0ff',
+                                    overflow: 'hidden',
+                                    background: 'rgba(0, 0, 0, 0.5)',
+                                    boxShadow: '0 0 20px rgba(0, 224, 255, 0.3)'
+                                }}>
+                                    <img 
+                                        src={progress.currentImage} 
+                                        alt="Processing" 
+                                        style={{ 
+                                            width: '100%', 
+                                            height: '100%', 
+                                            objectFit: 'contain',
+                                            display: 'block'
+                                        }} 
+                                    />
+                                </div>
+                                <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '8px', wordBreak: 'break-all', maxWidth: '400px', margin: '8px auto 0' }}>
+                                    {progress.currentImage.split(/[/\\]/).pop()}
+                                </p>
+                            </div>
+                        )}
+                        {!progress.currentImage && progress.current === 0 && (
+                            <div style={{ fontSize: '0.85rem', color: '#888', marginTop: '15px' }}>
+                                Initializing... Please wait
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -622,40 +752,49 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
 
                 {/* Action Button */}
                 <div style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                    <button
-                        className="btn-secondary"
-                        onClick={onClose}
-                        style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                        disabled={isProcessing}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        className="btn-primary"
-                        onClick={handleProcess}
-                        disabled={isProcessing || filteredImages.length === 0}
-                        style={{ 
-                            padding: '10px 30px', 
-                            fontSize: '0.9rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            opacity: (isProcessing || filteredImages.length === 0) ? 0.5 : 1,
-                            cursor: (isProcessing || filteredImages.length === 0) ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        {isProcessing ? (
-                            <>
-                                <Loader size={16} className="spin" />
-                                Processing...
-                            </>
-                        ) : (
-                            <>
+                    {isProcessing ? (
+                        <button
+                            className="btn-secondary"
+                            onClick={handleCancel}
+                            style={{ 
+                                padding: '10px 20px', 
+                                fontSize: '0.9rem',
+                                background: 'rgba(255, 68, 68, 0.2)',
+                                border: '1px solid rgba(255, 68, 68, 0.5)',
+                                color: '#ffaaaa'
+                            }}
+                            disabled={isCancelling}
+                        >
+                            {isCancelling ? 'Cancelling...' : 'Cancel Processing'}
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                className="btn-secondary"
+                                onClick={onClose}
+                                style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                            >
+                                Close
+                            </button>
+                            <button
+                                className="btn-primary"
+                                onClick={handleProcess}
+                                disabled={filteredImages.length === 0}
+                                style={{ 
+                                    padding: '10px 30px', 
+                                    fontSize: '0.9rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    opacity: filteredImages.length === 0 ? 0.5 : 1,
+                                    cursor: filteredImages.length === 0 ? 'not-allowed' : 'pointer'
+                                }}
+                            >
                                 <Sparkles size={16} />
                                 Start {mode === 'verify' ? 'Verification' : mode === 'annotate' ? 'Annotation' : 'Modification'}
-                            </>
-                        )}
-                    </button>
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 

@@ -1,3 +1,23 @@
+/**
+ * @fileoverview CollapsiblePanel Component - Reusable Collapsible Panel
+ * 
+ * This component provides a reusable collapsible panel with:
+ * - Collapse/expand functionality
+ * - Customizable header and container styles
+ * - Icon support
+ * - Smooth animations
+ * 
+ * @component
+ * @param {Object} props - Component props
+ * @param {string} props.title - Panel title
+ * @param {React.ComponentType} props.icon - Icon component
+ * @param {React.ReactNode} props.children - Panel content
+ * @param {boolean} props.defaultCollapsed - Initial collapsed state
+ * @param {Object} props.headerStyle - Custom header styles
+ * @param {Object} props.containerStyle - Custom container styles (supports background, backdropFilter)
+ * @returns {JSX.Element} The rendered collapsible panel component
+ */
+
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -11,6 +31,8 @@ function CollapsiblePanel({ title, icon: Icon, children, defaultCollapsed = fals
             display: 'flex', 
             flexDirection: 'column',
             transition: 'all 0.3s ease',
+            background: containerStyle.background || 'rgba(20, 20, 35, 0.3)',
+            backdropFilter: containerStyle.backdropFilter || 'blur(8px)',
             ...containerStyle
         }}>
             <div 
