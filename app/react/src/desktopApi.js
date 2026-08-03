@@ -1,6 +1,6 @@
 /**
- * Bridge desktop Tauri — API compatible avec l'ancien `window.electronAPI`.
- * Dialogues natifs + lecture fichiers + événements backend.
+ * Desktop bridge (Tauri) — dialogs, file read, backend events.
+ * Also exposed as `window.electronAPI` for existing call sites.
  */
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';

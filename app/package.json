@@ -1,6 +1,6 @@
 {
     "name": "lama-worlds-annotation-studio",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Lama Worlds Annotation Studio — Tauri + React + FastAPI",
     "private": true,
     "scripts": {
@@ -28,9 +28,6 @@
     "devDependencies": {
         "@tauri-apps/cli": "^2.11.4",
         "@vitejs/plugin-react": "^4.2.0",
-        "concurrently": "^8.2.2",
-        "electron": "^28.0.0",
-        "electron-builder": "^24.9.1",
         "vite": "^5.0.0"
     },
     "dependencies": {
@@ -39,7 +36,6 @@
         "@tauri-apps/plugin-fs": "^2.5.1",
         "@tauri-apps/plugin-shell": "^2.3.5",
         "axios": "^1.6.2",
-        "framer-motion": "^10.16.5",
         "konva": "^9.3.0",
         "lucide-react": "^0.294.0",
         "react": "^18.2.0",

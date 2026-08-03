@@ -1,0 +1,30 @@
+# Dependencies & build output
+node_modules/
+dist/
+release/
+*.log
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Env / secrets
+.env
+.env.*
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Tauri / Rust (also ignored under src-tauri/.gitignore)
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# OS
+Desktop.ini

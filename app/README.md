@@ -1,38 +1,39 @@
-# Lama Worlds Annotation Studio
+# Developer notes (`app/`)
 
-Annotateur YOLO local — **Tauri 2** (Rust) + **React** + **FastAPI** (Python).
+Working directory for npm / Tauri / Python backend.
 
-## Prérequis
+## Commands
 
-- Node.js 18+
-- Rust (rustup) + MSVC Build Tools (Windows)
-- Python 3.10+ avec `pip install -r requirements.txt`
-- WebView2 (Windows, en général déjà installé)
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Tauri desktop + Vite + Python backend |
+| `npm run dev:vite` | Vite only (UI without shell) |
+| `npm run build` | Build React → `dist/` |
+| `npm run build:app` | Full Tauri production build |
+| `npm run build:win` | Tauri NSIS bundle |
+| `npm run diagnose` | Check Python / deps |
+| `npm run test-python` | Quick Python smoke test |
 
-## Développement
+## Stack
+
+- **Shell:** Tauri 2 (`src-tauri/`) — dialogs, file read, asset protocol, backend spawn
+- **UI:** React 18 + Vite (`react/`) — i18n EN/FR via `react/src/i18n/`
+- **Bridge:** `react/src/desktopApi.js` (exposed as `window.electronAPI` for legacy call sites)
+- **API:** FastAPI (`backend/`) on `http://127.0.0.1:8000`
+
+## Backend
 
 ```bash
-cd app
-npm install
 pip install -r requirements.txt
-npm run dev
 ```
 
-`npm run dev` lance Tauri, qui démarre Vite (`5173`) et spawne le backend Python (`8000`).
+Optional Vision LLM (GGUF): `llama-cpp-python` is listed in `requirements.txt`.
 
-## Build
+Helper scripts:
 
-```bash
-npm run build:app
-```
+- `install-backend-deps.bat` / `install-backend-deps.ps1`
+- `scripts/diagnose-python.js`
 
-## Architecture
+## Icons
 
-| Couche | Techno |
-|--------|--------|
-| Shell desktop | Tauri 2 / Rust (`src-tauri/`) |
-| UI | React + Vite (`react/`) |
-| Bridge | `react/src/desktopApi.js` (compat `window.electronAPI`) |
-| API / YOLO / export | FastAPI (`backend/`) |
-
-L’ancien shell Electron (`electron/`) n’est plus utilisé par les scripts npm.
+Brand assets live in `assets/Logo/`. Tauri icons are generated under `src-tauri/icons/` (`npx tauri icon assets/Logo/app-icon-source.png`).

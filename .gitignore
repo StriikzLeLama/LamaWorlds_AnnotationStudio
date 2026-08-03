@@ -1,18 +1,16 @@
+# Root ignores — app has its own .gitignore for node/tauri/python
 node_modules/
-dist/
-release/
-*.log
+**/dist/
+**/release/
+**/__pycache__/
+**/*.pyc
 .DS_Store
+Thumbs.db
 .env
-.env.local
-*.pyc
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-build/
-develop-eggs/
-*.egg-info/
-.installed.cfg
-*.egg
+.env.*
+.idea/
+.vscode/
 
+# Large local-only caches
+app/src-tauri/target/
+app/node_modules/
