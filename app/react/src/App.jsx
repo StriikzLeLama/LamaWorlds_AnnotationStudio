@@ -26,9 +26,11 @@ import AdvancedSearch from './components/AdvancedSearch';
 import BatchImageActions from './components/BatchImageActions';
 import ImagePreviewTooltip from './components/ImagePreviewTooltip';
 import ThemeManager from './components/ThemeManager';
+import LanguageToggle from './components/LanguageToggle';
 
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useSettings, loadSettings } from './hooks/useSettings';
+import { useI18n } from './i18n/I18nContext';
 import api from './api/client';
 import './styles/index.css';
 
@@ -45,6 +47,8 @@ import './styles/index.css';
  * @returns {JSX.Element} The rendered application
  */
 function App() {
+    const { t } = useI18n();
+
     // ========================================================================
     // State Management - Dataset & Images
     // ========================================================================
@@ -318,12 +322,12 @@ function App() {
     }, []);
 
     /**
-     * Open a dataset folder using Electron's dialog.
+     * Ouvre un dossier dataset via le dialogue natif Tauri.
      */
     const handleOpenDataset = useCallback(async () => {
         try {
             if (!window.electronAPI || !window.electronAPI.selectFolder) {
-                alert("Electron API not available. Please run in Electron.");
+                alert(t('alert.desktopApi'));
                 return;
             }
             const folderPath = await window.electronAPI.selectFolder();
@@ -334,7 +338,7 @@ function App() {
             console.error('Failed to open dataset:', err);
             alert('Failed to open dataset: ' + (err.message || 'Unknown error'));
         }
-    }, [loadDataset]);
+    }, [loadDataset, t]);
 
     /**
      * Load application state from localStorage
@@ -388,6 +392,17 @@ function App() {
     useEffect(() => {
         loadState();
     }, [loadState]);
+
+    // Événements backend émis par le shell Tauri (spawn Python)
+    useEffect(() => {
+        if (!window.electronAPI?.onBackendError) return undefined;
+        const offErr = window.electronAPI.onBackendError((msg) => setBackendError(String(msg)));
+        const offReady = window.electronAPI.onBackendReady?.(() => setBackendError(null));
+        return () => {
+            offErr?.();
+            offReady?.();
+        };
+    }, []);
 
     // Save state when relevant values change
     useEffect(() => {
@@ -500,7 +515,7 @@ function App() {
     const handleImportYaml = useCallback(async () => {
         try {
             if (!window.electronAPI || !window.electronAPI.selectFile) {
-                alert("Electron API not available. Please run in Electron.");
+                alert(t('alert.desktopApi'));
                 return;
             }
 
@@ -747,7 +762,7 @@ function App() {
             {/* Bannière d'erreur backend (si le process Python est down) */}
             {backendError && !datasetPath && (
                 <div className="toast-error">
-                    <strong>Backend :</strong> {backendError}
+                    <strong>{t('backend.toast')}</strong> {backendError}
                 </div>
             )}
 
@@ -822,30 +837,27 @@ function App() {
                             <h1 className="welcome-brand">
                                 Lama Worlds <em>Annotation Studio</em>
                             </h1>
-                            <p className="welcome-sub">
-                                Ouvrez un dossier dataset (images + labels YOLO) pour commencer
-                                l&apos;annotation.
-                            </p>
+                            <p className="welcome-sub">{t('welcome.subtitle')}</p>
                             <button type="button" className="btn-primary btn-lg" onClick={handleOpenDataset}>
                                 <FolderOpen size={22} />
-                                Ouvrir un dataset
+                                {t('welcome.openDataset')}
                             </button>
                             <p className="welcome-hint">
-                                Raccourci : <kbd>Ctrl</kbd> + <kbd>O</kbd>
+                                {t('welcome.shortcut')} <kbd>Ctrl</kbd> + <kbd>O</kbd>
                             </p>
                         </div>
                     )}
 
                     {datasetPath && (
                         <>
-                            {/* Barre d'outils supérieure */}
+                            {/* Top toolbar */}
                             <div className="glass-panel topbar title-drag-region">
                                 {backendError && (
                                     <div className="inline-error">
-                                        <strong>Erreur backend</strong>
+                                        <strong>{t('backend.error')}</strong>
                                         <div style={{ marginTop: 6 }}>{backendError}</div>
                                         <div style={{ fontSize: '0.75rem', marginTop: 8, opacity: 0.85 }}>
-                                            Vérifiez Python 3.10+ puis :{' '}
+                                            {t('backend.fixHint')}{' '}
                                             <code>pip install -r requirements.txt</code>
                                         </div>
                                     </div>
@@ -854,16 +866,16 @@ function App() {
                                 <div className="topbar-row">
                                     <div className="topbar-left">
                                         <div className="brand">
-                                            Lama <span>Studio</span>
+                                            {t('brand.name')} <span>{t('brand.studio')}</span>
                                         </div>
 
                                         <button
                                             type="button"
                                             className="btn-secondary"
-                                            title="Ouvrir un dossier dataset (Ctrl+O)"
+                                            title={t('toolbar.datasetTitle')}
                                             onClick={async () => {
                                                 if (!window.electronAPI?.selectFolder) {
-                                                    alert('Electron API not available. Please run in Electron.');
+                                                    alert(t('alert.desktopApi'));
                                                     return;
                                                 }
                                                 const folderPath = await window.electronAPI.selectFolder();
@@ -871,7 +883,7 @@ function App() {
                                             }}
                                         >
                                             <FolderOpen size={15} />
-                                            Dataset
+                                            {t('toolbar.dataset')}
                                         </button>
 
                                         <LayoutManager
@@ -906,23 +918,25 @@ function App() {
                                             onThemeChange={setCurrentTheme}
                                         />
 
+                                        <LanguageToggle />
+
                                         <button
                                             type="button"
                                             className="btn-ghost"
                                             onClick={() => setShowShortcuts(true)}
-                                            title="Raccourcis clavier (?)"
+                                            title={t('toolbar.helpTitle')}
                                         >
-                                            ? Aide
+                                            ? {t('toolbar.help')}
                                         </button>
 
                                         <button
                                             type="button"
                                             className="btn-ghost"
                                             onClick={() => setShowSettings(true)}
-                                            title="Paramètres"
+                                            title={t('toolbar.settingsTitle')}
                                         >
                                             <Settings size={14} />
-                                            Réglages
+                                            {t('toolbar.settings')}
                                         </button>
 
                                         <div
@@ -938,18 +952,18 @@ function App() {
                                                     className="btn-ghost"
                                                     onClick={handleUndo}
                                                     disabled={!canUndo}
-                                                    title="Annuler (Ctrl+Z)"
+                                                    title={t('toolbar.undoTitle')}
                                                 >
-                                                    ↶ Undo
+                                                    ↶ {t('toolbar.undo')}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className="btn-ghost"
                                                     onClick={handleRedo}
                                                     disabled={!canRedo}
-                                                    title="Rétablir (Ctrl+Y)"
+                                                    title={t('toolbar.redoTitle')}
                                                 >
-                                                    ↷ Redo
+                                                    ↷ {t('toolbar.redo')}
                                                 </button>
                                             </>
                                         )}
@@ -966,7 +980,10 @@ function App() {
                                     <div className="progress-block">
                                         <div className="progress-meta">
                                             <span>
-                                                Image {currentImageIndex + 1} / {images.length}
+                                                {t('toolbar.imageProgress', {
+                                                    current: currentImageIndex + 1,
+                                                    total: images.length,
+                                                })}
                                             </span>
                                             <span>
                                                 {Math.round(((currentImageIndex + 1) / images.length) * 100)}%
@@ -1084,7 +1101,7 @@ function App() {
                 setSearchInAnnotations={setSearchInAnnotations}
                 onExport={async (format) => {
                     if (!datasetPath) {
-                        alert('Please open a dataset first');
+                        alert(t('alert.openDatasetFirst'));
                         return;
                     }
                     
@@ -1103,7 +1120,7 @@ function App() {
                             alert(`Report export completed!\n\nFile: ${res.data.output_path || res.data.file}`);
                         } else if (format === 'project') {
                             if (!window.electronAPI || !window.electronAPI.selectFolder) {
-                                alert("Electron API not available. Please run in Electron.");
+                                alert(t('alert.desktopApi'));
                                 return;
                             }
                             const folderPath = await window.electronAPI.selectFolder();
@@ -1116,7 +1133,7 @@ function App() {
                             alert(`Project export completed!\n\nDirectory: ${res.data.output_path}`);
                         } else if (format === 'import_project') {
                             if (!window.electronAPI || !window.electronAPI.selectFolder) {
-                                alert("Electron API not available. Please run in Electron.");
+                                alert(t('alert.desktopApi'));
                                 return;
                             }
                             const folderPath = await window.electronAPI.selectFolder();
@@ -1160,11 +1177,11 @@ function App() {
                             type="button"
                             className="btn-ghost"
                             onClick={() => setShowStatsPanels(!showStatsPanels)}
-                            title={showStatsPanels ? 'Masquer les stats' : 'Afficher les stats'}
+                            title={showStatsPanels ? t('toolbar.hideStatsTitle') : t('toolbar.showStatsTitle')}
                             style={{ alignSelf: 'flex-end' }}
                         >
                             {showStatsPanels ? <EyeOff size={14} /> : <Eye size={14} />}
-                            {showStatsPanels && <span>Masquer</span>}
+                            {showStatsPanels && <span>{t('toolbar.hideStats')}</span>}
                         </button>
 
                         {showStatsPanels && (

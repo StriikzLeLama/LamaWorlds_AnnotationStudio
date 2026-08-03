@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Maximize2, Minimize2, FlipHorizontal, FlipVertical, Eye, EyeOff } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import MiniMap from './MiniMap';
+import { toAssetUrl } from '../desktopApi';
 
 /**
  * CanvasImage Component - Memoized image component for performance
@@ -32,7 +33,9 @@ import MiniMap from './MiniMap';
  * @returns {JSX.Element|null} The rendered image component
  */
 const CanvasImage = React.memo(({ src, rotation = 0, flip = { horizontal: false, vertical: false }, onImageLoad }) => {
-    const [image] = useImage(src);
+    // Chemins disque → asset:// sous Tauri (WebView ne charge pas file:// librement)
+    const resolvedSrc = React.useMemo(() => toAssetUrl(src), [src]);
+    const [image] = useImage(resolvedSrc);
     const onImageLoadRef = React.useRef(onImageLoad);
     
     // Update ref when callback changes

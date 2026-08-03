@@ -1,8 +1,9 @@
 /**
- * Panneau repliable réutilisable (stats, validation, analytics…).
+ * Reusable collapsible panel (stats, validation, analytics…).
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
 
 function CollapsiblePanel({
     title,
@@ -12,6 +13,7 @@ function CollapsiblePanel({
     headerStyle = {},
     containerStyle = {},
 }) {
+    const { t } = useI18n();
     const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
     return (
@@ -48,7 +50,7 @@ function CollapsiblePanel({
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    title={isCollapsed ? 'Développer' : 'Réduire'}
+                    title={isCollapsed ? t('panel.expand') : t('panel.collapse')}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>

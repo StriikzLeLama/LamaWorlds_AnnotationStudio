@@ -18,6 +18,7 @@
 
 import React from 'react';
 import { Image as ImageIcon } from 'lucide-react';
+import { toAssetUrl } from '../desktopApi';
 
 function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], position = { x: 0, y: 0 } }) {
     if (!imagePath) return null;
@@ -26,6 +27,8 @@ function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], positi
         const parts = path.split(/[/\\]/);
         return parts[parts.length - 1];
     };
+
+    const previewSrc = toAssetUrl(imagePath);
 
     return (
         <div style={{
@@ -47,7 +50,7 @@ function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], positi
                 {getName(imagePath)}
             </div>
             <img
-                src={imagePath}
+                src={previewSrc}
                 alt={getName(imagePath)}
                 style={{
                     width: '100%',

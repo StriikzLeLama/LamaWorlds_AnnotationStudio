@@ -1,34 +1,34 @@
 /**
- * @fileoverview Main Entry Point - React Application Bootstrap
- * 
- * This is the main entry point for the React application.
- * It mounts the App component to the DOM root element.
- * 
- * @module main
+ * React entry — Tauri bridge + i18n (EN default).
  */
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import { installDesktopBridge } from './desktopApi.js';
+import { I18nProvider } from './i18n/I18nContext.jsx';
+import './styles/index.css';
 
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './styles/index.css'
+installDesktopBridge();
 
-console.log("React mounting...");
+console.log('React mounting (Tauri shell)…');
 
-// Check if root element exists
 const rootElement = document.getElementById('root');
 if (!rootElement) {
     console.error('Root element not found!');
-    document.body.innerHTML = '<div style="color: white; padding: 20px; background: #050510; height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column;"><h1>Error: Root element not found</h1><p>Please check the HTML file.</p></div>';
+    document.body.innerHTML =
+        '<div style="color:#e8edf4;padding:20px;background:#0e1116;height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column"><h1>Error: #root not found</h1></div>';
 } else {
     try {
         ReactDOM.createRoot(rootElement).render(
             <React.StrictMode>
-                <App />
-            </React.StrictMode>,
+                <I18nProvider>
+                    <App />
+                </I18nProvider>
+            </React.StrictMode>
         );
-        console.log("React mounted successfully");
+        console.log('React mounted successfully');
     } catch (error) {
-        console.error("Error mounting React:", error);
-        rootElement.innerHTML = `<div style="color: white; padding: 20px; background: #050510; height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column;"><h1>Error: React failed to mount</h1><p>${error.message}</p><pre style="background: rgba(255,0,0,0.2); padding: 10px; border-radius: 4px; overflow: auto; max-width: 80%;">${error.stack}</pre></div>`;
+        console.error('Error mounting React:', error);
+        rootElement.innerHTML = `<div style="color:#e8edf4;padding:20px;background:#0e1116"><h1>React mount failed</h1><pre>${error.message}</pre></div>`;
     }
 }

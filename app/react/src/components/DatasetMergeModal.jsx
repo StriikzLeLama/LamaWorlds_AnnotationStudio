@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, FolderOpen, Merge, AlertCircle, CheckCircle } from 'lucide-react';
 import axios from 'axios';
+import { useI18n } from '../i18n/I18nContext';
 
 const API_URL = 'http://localhost:8000';
 const api = axios.create({ baseURL: API_URL, timeout: 300000 }); // 5 minutes timeout for large merges
 
 function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
+    const { t } = useI18n();
     const [datasets, setDatasets] = useState([]);
     const [outputPath, setOutputPath] = useState('');
     const [merging, setMerging] = useState(false);
@@ -15,7 +17,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
 
     const addDataset = async () => {
         if (!window.electronAPI || !window.electronAPI.selectDirectory) {
-            alert("Electron API not available. Please run in Electron.");
+            alert(t('alert.desktopApi'));
             return;
         }
 
@@ -37,7 +39,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
 
     const selectOutputPath = async () => {
         if (!window.electronAPI || !window.electronAPI.selectDirectory) {
-            alert("Electron API not available. Please run in Electron.");
+            alert(t('alert.desktopApi'));
             return;
         }
 

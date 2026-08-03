@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { Palette, Moon, Sun, Focus } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
 
 /** Définition des palettes (doivent rester alignées avec styles/index.css). */
 const THEMES = {
@@ -73,6 +74,7 @@ const THEMES = {
 };
 
 function ThemeManager({ currentTheme, onThemeChange }) {
+    const { t } = useI18n();
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef(null);
 
@@ -119,10 +121,10 @@ function ThemeManager({ currentTheme, onThemeChange }) {
                 type="button"
                 className="btn-ghost"
                 onClick={() => setShowMenu(!showMenu)}
-                title="Thème"
+                title={t('toolbar.themeTitle')}
             >
                 <Icon size={14} />
-                Thème
+                {t('toolbar.theme')}
             </button>
 
             {showMenu && (
@@ -141,6 +143,7 @@ function ThemeManager({ currentTheme, onThemeChange }) {
                     {Object.entries(THEMES).map(([key, theme]) => {
                         const ThemeIcon = theme.icon;
                         const isActive = currentTheme === key;
+                        const labelKey = `theme.${key}`;
                         return (
                             <button
                                 key={key}
@@ -157,7 +160,7 @@ function ThemeManager({ currentTheme, onThemeChange }) {
                                 }}
                             >
                                 <ThemeIcon size={16} />
-                                {theme.name}
+                                {t(labelKey)}
                             </button>
                         );
                     })}

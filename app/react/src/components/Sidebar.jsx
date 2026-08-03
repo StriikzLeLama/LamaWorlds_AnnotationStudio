@@ -3,8 +3,10 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings, Ruler, ChevronDown, ChevronUp, FileText, Zap, History, Search } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
 
 function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, selectedAnnotationId, onChangeAnnotationClass, onImportYaml, annotations, onBatchDeleteClass, onBatchChangeClass, onAlignAnnotations, onPreAnnotate, yoloModelPath, setYoloModelPath, yoloConfidence, setYoloConfidence, recentClasses = [], quickDrawMode = false, onToggleQuickDraw, showMeasurements = false, onToggleMeasurements, annotationTemplates = [], onSaveTemplate, onLoadTemplate, onDeleteTemplate, onOpenVisionLLM }) {
+    const { t } = useI18n();
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState('');
     const [newClassName, setNewClassName] = useState('');
@@ -120,7 +122,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
     const saveTemplate = () => {
         if (!window.electronAPI || !window.electronAPI.selectFile) {
-            alert("Electron API not available");
+            alert(t('alert.desktopApi'));
             return;
         }
         
@@ -141,7 +143,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
     const loadTemplate = async () => {
         if (!window.electronAPI || !window.electronAPI.selectFile) {
-            alert("Electron API not available");
+            alert(t('alert.desktopApi'));
             return;
         }
         
@@ -214,7 +216,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                 }}
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                {!isCollapsed && <h3 className="panel-title">Classes</h3>}
+                {!isCollapsed && <h3 className="panel-title">{t('panel.classes')}</h3>}
                 <button
                     type="button"
                     className="btn-icon"
@@ -222,7 +224,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    title={isCollapsed ? 'Développer' : 'Réduire'}
+                    title={isCollapsed ? t('panel.expand') : t('panel.collapse')}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>
@@ -235,7 +237,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     <Search size={14} className="search-icon" />
                     <input
                         type="text"
-                        placeholder="Rechercher une classe…"
+                        placeholder={t('panel.searchClasses')}
                         value={classSearchQuery}
                         onChange={(e) => setClassSearchQuery(e.target.value)}
                     />
@@ -277,7 +279,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
                 <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
                 <input
-                    placeholder="New Class"
+                    placeholder={t('panel.newClass')}
                     value={newClassName}
                     onChange={e => setNewClassName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addClass()}

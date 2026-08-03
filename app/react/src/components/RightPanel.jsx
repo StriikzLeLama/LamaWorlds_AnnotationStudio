@@ -4,8 +4,11 @@
 import React, { useRef, useEffect, useState, useMemo, createRef } from 'react';
 import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag, ChevronDown, ChevronUp, Download, Upload, FileText, Merge, Eye, FileJson, FileCode, History, Maximize2, Minimize2, Zap, Check } from 'lucide-react';
 import api from '../api/client';
+import { toAssetUrl } from '../desktopApi';
+import { useI18n } from '../i18n/I18nContext';
 
 function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated, annotatedImages, filterClassId, setFilterClassId, annotationCache, onDeleteImage, setImages, annotationComments = {}, onUpdateAnnotationComment, imageTags = {}, onUpdateImageTag, searchInAnnotations = false, setSearchInAnnotations, onOpenDatasetMerge, selectedImages = new Set(), onToggleImageSelection, onImagePreview }) {
+    const { t } = useI18n();
     // State for class selector dropdowns (one per annotation)
     const [openSelectors, setOpenSelectors] = useState({});
     const [classSearchQueries, setClassSearchQueries] = useState({});
@@ -430,7 +433,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                 }}
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                {!isCollapsed && <h4 className="panel-title">Images & annotations</h4>}
+                {!isCollapsed && <h4 className="panel-title">{t('panel.imagesAnnotations')}</h4>}
                 <button
                     type="button"
                     className="btn-icon"
@@ -438,7 +441,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    title={isCollapsed ? 'Développer' : 'Réduire'}
+                    title={isCollapsed ? t('panel.expand') : t('panel.collapse')}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>
@@ -449,7 +452,9 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
             {/* Liste des annotations de l'image courante */}
             <div style={{ padding: '8px 0 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', height: '40%' }}>
                 <h4 className="panel-title" style={{ marginBottom: 10 }}>
-                    Annotations ({Array.isArray(annotations) ? annotations.length : 0})
+                    {t('panel.annotations', {
+                        count: Array.isArray(annotations) ? annotations.length : 0,
+                    })}
                 </h4>
                 <div style={{ height: 'calc(100% - 30px)', overflowY: 'auto' }}>
                     {Array.isArray(annotations) && annotations.map((ann, i) => {
@@ -1816,7 +1821,7 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                         }}
                     >
                         <img
-                            src={img}
+                            src={toAssetUrl(img)}
                             alt={getName(img)}
                             style={{
                                 width: '100%',
