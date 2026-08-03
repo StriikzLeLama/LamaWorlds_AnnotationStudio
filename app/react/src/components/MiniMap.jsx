@@ -35,10 +35,10 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
                     bottom: '20px',
                     right: '20px',
                     padding: '10px',
-                    background: 'rgba(0, 224, 255, 0.2)',
-                    border: '1px solid rgba(0, 224, 255, 0.5)',
+                    background: 'rgba(45, 212, 191, 0.2)',
+                    border: '1px solid rgba(45, 212, 191, 0.5)',
                     borderRadius: '8px',
-                    color: '#00e0ff',
+                    color: 'var(--accent)',
                     cursor: 'pointer',
                     zIndex: 1000,
                     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
@@ -65,7 +65,7 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
                 maxHeight: '400px',
                 background: 'rgba(20, 20, 35, 0.95)',
                 backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(0, 224, 255, 0.3)',
+                border: '1px solid rgba(45, 212, 191, 0.3)',
                 borderRadius: '12px',
                 padding: '12px',
                 zIndex: 10000,
@@ -74,8 +74,8 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
         >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Map size={16} style={{ color: '#00e0ff' }} />
-                    <span className="neon-text" style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
+                    <Map size={16} style={{ color: 'var(--accent)' }} />
+                    <span className="panel-title" style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
                         Dataset Map ({totalImages} images)
                     </span>
                 </div>
@@ -104,7 +104,7 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
                     onChange={(e) => setZoom(parseFloat(e.target.value))}
                     style={{ flex: 1 }}
                 />
-                <span style={{ fontSize: '0.75rem', color: '#00e0ff', minWidth: '30px' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent)', minWidth: '30px' }}>
                     {Math.round(zoom * 100)}%
                 </span>
             </div>
@@ -138,12 +138,12 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
                                 width: `${cellSize * zoom}px`,
                                 height: `${cellSize * zoom}px`,
                                 background: isCurrent
-                                    ? 'rgba(0, 224, 255, 0.8)'
+                                    ? 'rgba(45, 212, 191, 0.8)'
                                     : hasAnnotations
                                     ? 'rgba(0, 255, 0, 0.3)'
                                     : 'rgba(255, 255, 255, 0.1)',
                                 border: isCurrent
-                                    ? '2px solid #00e0ff'
+                                    ? '2px solid var(--accent)'
                                     : hasAnnotations
                                     ? '1px solid rgba(0, 255, 0, 0.5)'
                                     : '1px solid rgba(255, 255, 255, 0.2)',
@@ -160,8 +160,8 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
                             }}
                             onMouseEnter={(e) => {
                                 if (!isCurrent) {
-                                    e.currentTarget.style.background = 'rgba(0, 224, 255, 0.4)';
-                                    e.currentTarget.style.borderColor = '#00e0ff';
+                                    e.currentTarget.style.background = 'rgba(45, 212, 191, 0.4)';
+                                    e.currentTarget.style.borderColor = 'var(--accent)';
                                 }
                             }}
                             onMouseLeave={(e) => {
@@ -184,7 +184,7 @@ function MiniMap({ images, currentIndex, onImageSelect, annotatedImages, viewpor
 
             <div style={{ marginTop: '10px', fontSize: '0.7rem', color: '#666', display: 'flex', gap: '12px', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ width: '12px', height: '12px', background: 'rgba(0, 224, 255, 0.8)', borderRadius: '2px' }}></div>
+                    <div style={{ width: '12px', height: '12px', background: 'rgba(45, 212, 191, 0.8)', borderRadius: '2px' }}></div>
                     <span>Current</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

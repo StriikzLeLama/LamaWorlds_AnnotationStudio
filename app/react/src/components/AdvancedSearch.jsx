@@ -77,10 +77,10 @@ function AdvancedSearch({
                 onClick={() => setIsOpen(true)}
                 style={{
                     padding: '6px 10px',
-                    background: 'rgba(0, 224, 255, 0.1)',
-                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                    background: 'rgba(45, 212, 191, 0.1)',
+                    border: '1px solid rgba(45, 212, 191, 0.3)',
                     borderRadius: '4px',
-                    color: '#00e0ff',
+                    color: 'var(--accent)',
                     cursor: 'pointer',
                     fontSize: '0.75rem',
                     display: 'flex',
@@ -106,7 +106,7 @@ function AdvancedSearch({
             maxHeight: '80vh',
             background: 'rgba(20, 20, 35, 0.95)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 224, 255, 0.3)',
+            border: '1px solid rgba(45, 212, 191, 0.3)',
             borderRadius: '12px',
             padding: '20px',
             zIndex: 10000,
@@ -114,7 +114,7 @@ function AdvancedSearch({
             overflowY: 'auto'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Search size={20} />
                     Advanced Search
                 </h3>

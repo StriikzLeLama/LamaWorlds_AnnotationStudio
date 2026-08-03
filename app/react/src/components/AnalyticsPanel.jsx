@@ -94,9 +94,9 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
     
     // Get class color
     const getClassColor = (classId) => {
-        if (!classes || !Array.isArray(classes)) return '#00e0ff';
+        if (!classes || !Array.isArray(classes)) return 'var(--accent)';
         const cls = classes.find(c => c && c.id === classId);
-        return cls ? cls.color : '#00e0ff';
+        return cls ? cls.color : 'var(--accent)';
     };
     
     // Sort classes by count
@@ -123,28 +123,28 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
         >
             {/* Overview Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                <div style={{ background: 'rgba(0, 224, 255, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.3)' }}>
+                <div style={{ background: 'rgba(45, 212, 191, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(45, 212, 191, 0.3)' }}>
                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Total Images</div>
-                    <div style={{ fontSize: '1.2rem', color: '#00e0ff', fontWeight: 'bold' }}>{stats.totalImages}</div>
+                    <div style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 'bold' }}>{stats.totalImages}</div>
                 </div>
-                <div style={{ background: 'rgba(0, 224, 255, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.3)' }}>
+                <div style={{ background: 'rgba(45, 212, 191, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(45, 212, 191, 0.3)' }}>
                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Annotated</div>
-                    <div style={{ fontSize: '1.2rem', color: '#00e0ff', fontWeight: 'bold' }}>{stats.annotatedCount}</div>
+                    <div style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 'bold' }}>{stats.annotatedCount}</div>
                 </div>
-                <div style={{ background: 'rgba(0, 224, 255, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.3)' }}>
+                <div style={{ background: 'rgba(45, 212, 191, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(45, 212, 191, 0.3)' }}>
                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Total Annotations</div>
-                    <div style={{ fontSize: '1.2rem', color: '#00e0ff', fontWeight: 'bold' }}>{stats.totalAnnotations}</div>
+                    <div style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 'bold' }}>{stats.totalAnnotations}</div>
                 </div>
-                <div style={{ background: 'rgba(0, 224, 255, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.3)' }}>
+                <div style={{ background: 'rgba(45, 212, 191, 0.1)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(45, 212, 191, 0.3)' }}>
                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Avg per Image</div>
-                    <div style={{ fontSize: '1.2rem', color: '#00e0ff', fontWeight: 'bold' }}>{stats.avgAnnotations}</div>
+                    <div style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 'bold' }}>{stats.avgAnnotations}</div>
                 </div>
             </div>
             
             {/* Class Distribution */}
             {sortedClasses.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '0.9rem', color: '#00e0ff', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--accent)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <PieChart size={16} />
                         Annotations by Class
                     </div>
@@ -159,7 +159,7 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
                                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: getClassColor(id), boxShadow: `0 0 3px ${getClassColor(id)}` }}></div>
                                             <span style={{ fontSize: '0.85rem', color: '#aaa' }}>{getClassName(id)}</span>
                                         </div>
-                                        <div style={{ fontSize: '0.85rem', color: '#00e0ff', fontWeight: 'bold' }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: 'bold' }}>
                                             {count} ({percentage}%)
                                         </div>
                                     </div>
@@ -181,22 +181,22 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
             {/* Size Statistics */}
             {stats.totalAnnotations > 0 && (
                 <div style={{ marginBottom: '20px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ fontSize: '0.9rem', color: '#00e0ff', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--accent)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Activity size={16} />
                         Size Statistics
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '0.8rem' }}>
                         <div>
                             <div style={{ color: '#888' }}>Average</div>
-                            <div style={{ color: '#00e0ff' }}>{(stats.avgSize / 1000).toFixed(1)}k px²</div>
+                            <div style={{ color: 'var(--accent)' }}>{(stats.avgSize / 1000).toFixed(1)}k px²</div>
                         </div>
                         <div>
                             <div style={{ color: '#888' }}>Min</div>
-                            <div style={{ color: '#00e0ff' }}>{(stats.minSize / 1000).toFixed(1)}k px²</div>
+                            <div style={{ color: 'var(--accent)' }}>{(stats.minSize / 1000).toFixed(1)}k px²</div>
                         </div>
                         <div>
                             <div style={{ color: '#888' }}>Max</div>
-                            <div style={{ color: '#00e0ff' }}>{(stats.maxSize / 1000).toFixed(1)}k px²</div>
+                            <div style={{ color: 'var(--accent)' }}>{(stats.maxSize / 1000).toFixed(1)}k px²</div>
                         </div>
                     </div>
                 </div>
@@ -204,7 +204,7 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
             
             {/* Progress */}
             <div style={{ paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <div style={{ fontSize: '0.9rem', color: '#00e0ff', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ fontSize: '0.9rem', color: 'var(--accent)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <TrendingUp size={16} />
                     Progress
                 </div>
@@ -212,7 +212,7 @@ function AnalyticsPanel({ images, annotations, classes, annotatedImages }) {
                     <div style={{ 
                         width: `${(stats.annotatedCount / stats.totalImages) * 100}%`, 
                         height: '100%', 
-                        background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
+                        background: 'linear-gradient(90deg, var(--accent), #56b0ff)',
                         transition: 'width 0.3s ease'
                     }}></div>
                 </div>

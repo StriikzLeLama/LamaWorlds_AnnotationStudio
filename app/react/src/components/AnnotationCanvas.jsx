@@ -141,9 +141,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
     }, []);
 
     const getColor = useCallback((clsId) => {
-        if (!classes || !Array.isArray(classes)) return '#00e0ff';
+        if (!classes || !Array.isArray(classes)) return '#2dd4bf';
         const cls = classes.find(c => c && c.id === clsId);
-        return cls ? cls.color : '#00e0ff';
+        return cls ? cls.color : '#2dd4bf';
     }, [classes]);
 
     const handleWheel = (e) => {
@@ -851,9 +851,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={zoomIn}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -868,9 +868,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={zoomOut}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -903,9 +903,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                         if (onToggleFullscreen) onToggleFullscreen();
                     }}
                     style={{
-                        background: isFullscreen ? 'rgba(0, 224, 255, 0.3)' : 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: isFullscreen ? 'rgba(45, 212, 191, 0.3)' : 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -924,9 +924,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                         window.dispatchEvent(event);
                     }}
                     style={{
-                        background: showAnnotations ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: showAnnotations ? '#00e0ff' : '#666',
+                        background: showAnnotations ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: showAnnotations ? '#2dd4bf' : '#666',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -942,9 +942,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={() => rotateImage('cw')}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -959,9 +959,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={() => rotateImage('ccw')}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -976,9 +976,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={() => flipImage('horizontal')}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -993,9 +993,9 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                 <button
                     onClick={() => flipImage('vertical')}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.2)',
-                        border: '1px solid rgba(0, 224, 255, 0.5)',
-                        color: '#00e0ff',
+                        background: 'rgba(45, 212, 191, 0.2)',
+                        border: '1px solid rgba(45, 212, 191, 0.5)',
+                        color: '#2dd4bf',
                         padding: '6px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -1052,7 +1052,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                     <Line
                                         key={`v-${i}`}
                                         points={[x, 0, x, imageDimensions.height]}
-                                        stroke="rgba(0, 224, 255, 0.3)"
+                                        stroke="rgba(45, 212, 191, 0.3)"
                                         strokeWidth={1}
                                         opacity={gridOpacity}
                                         listening={false}
@@ -1066,7 +1066,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                     <Line
                                         key={`h-${i}`}
                                         points={[0, y, imageDimensions.width, y]}
-                                        stroke="rgba(0, 224, 255, 0.3)"
+                                        stroke="rgba(45, 212, 191, 0.3)"
                                         strokeWidth={1}
                                         opacity={gridOpacity}
                                         listening={false}
@@ -1080,7 +1080,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                         if (!ann || !ann.id) return null;
                         const isSelected = selectedId === ann.id || (selectedIds && selectedIds.has(ann.id));
                         const className = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
-                        const classColor = className ? className.color : '#00e0ff';
+                        const classColor = className ? className.color : '#2dd4bf';
                         const classNameStr = className ? className.name : `Class ${ann.class_id}`;
                         const rgb = classColor.match(/\w\w/g)?.map(x => parseInt(x, 16)) || [0, 224, 255];
                         return (
@@ -1216,7 +1216,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                     {/* Width line */}
                                     <Line
                                         points={[ann.x, ann.y - 25, ann.x + ann.width, ann.y - 25]}
-                                        stroke="#00e0ff"
+                                        stroke="#2dd4bf"
                                         strokeWidth={1}
                                         dash={[5, 5]}
                                         listening={false}
@@ -1226,7 +1226,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                         y={ann.y - 40}
                                         text={`W: ${Math.abs(ann.width).toFixed(1)}px`}
                                         fontSize={11}
-                                        fill="#00e0ff"
+                                        fill="#2dd4bf"
                                         align="center"
                                         listening={false}
                                         offsetX={30}
@@ -1234,7 +1234,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                     {/* Height line */}
                                     <Line
                                         points={[ann.x - 25, ann.y, ann.x - 25, ann.y + ann.height]}
-                                        stroke="#00e0ff"
+                                        stroke="#2dd4bf"
                                         strokeWidth={1}
                                         dash={[5, 5]}
                                         listening={false}
@@ -1244,7 +1244,7 @@ const AnnotationCanvas = ({ imageUrl, annotations, onChange, selectedClassId, cl
                                         y={ann.y + ann.height / 2}
                                         text={`H: ${Math.abs(ann.height).toFixed(1)}px`}
                                         fontSize={11}
-                                        fill="#00e0ff"
+                                        fill="#2dd4bf"
                                         align="center"
                                         listening={false}
                                         offsetY={15}

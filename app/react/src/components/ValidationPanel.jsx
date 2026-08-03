@@ -19,11 +19,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
-import axios from 'axios';
 import CollapsiblePanel from './CollapsiblePanel';
-
-const API_URL = 'http://localhost:8000';
-const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+import api from '../api/client';
 
 function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnnotation }) {
     const [issues, setIssues] = useState([]);
@@ -164,11 +161,11 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
                     onClick={validateAnnotations}
                     disabled={validating}
                     style={{
-                        background: 'rgba(0, 224, 255, 0.1)',
-                        border: '1px solid rgba(0, 224, 255, 0.3)',
+                        background: 'rgba(45, 212, 191, 0.1)',
+                        border: '1px solid rgba(45, 212, 191, 0.3)',
                         borderRadius: '4px',
                         padding: '4px 8px',
-                        color: '#00e0ff',
+                        color: 'var(--accent)',
                         cursor: validating ? 'wait' : 'pointer',
                         fontSize: '0.75rem',
                         display: 'flex',
@@ -245,10 +242,10 @@ function ValidationPanel({ annotations, currentImagePath, datasetPath, onFixAnno
                                 style={{
                                     marginTop: '6px',
                                     padding: '4px 8px',
-                                    background: 'rgba(0, 224, 255, 0.2)',
-                                    border: '1px solid rgba(0, 224, 255, 0.5)',
+                                    background: 'rgba(45, 212, 191, 0.2)',
+                                    border: '1px solid rgba(45, 212, 191, 0.5)',
                                     borderRadius: '4px',
-                                    color: '#00e0ff',
+                                    color: 'var(--accent)',
                                     cursor: 'pointer',
                                     fontSize: '0.75rem',
                                     width: '100%'

@@ -76,11 +76,11 @@ function MeasurementsPanel({ annotations, classes, imageDimensions, selectedId, 
                 <div key={m.id || idx} style={{
                     padding: '12px',
                     marginBottom: '10px',
-                    background: 'rgba(0, 224, 255, 0.05)',
+                    background: 'rgba(45, 212, 191, 0.05)',
                     borderRadius: '6px',
-                    border: '1px solid rgba(0, 224, 255, 0.2)'
+                    border: '1px solid rgba(45, 212, 191, 0.2)'
                 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '8px' }}>
                         {m.className}
                     </div>
                     
@@ -88,39 +88,39 @@ function MeasurementsPanel({ annotations, classes, imageDimensions, selectedId, 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Maximize2 size={12} style={{ color: '#888' }} />
                             <span style={{ color: '#aaa' }}>Width:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.width}px</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.width}px</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Maximize2 size={12} style={{ color: '#888' }} />
                             <span style={{ color: '#aaa' }}>Height:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.height}px</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.height}px</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ruler size={12} style={{ color: '#888' }} />
                             <span style={{ color: '#aaa' }}>Area:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.area}px²</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.area}px²</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: '#aaa' }}>Ratio:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.aspectRatio}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.aspectRatio}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Move size={12} style={{ color: '#888' }} />
                             <span style={{ color: '#aaa' }}>X:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.position.x}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.position.x}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Move size={12} style={{ color: '#888' }} />
                             <span style={{ color: '#aaa' }}>Y:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.position.y}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.position.y}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: '#aaa' }}>Center X:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.centerX}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.centerX}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: '#aaa' }}>Center Y:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{m.centerY}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{m.centerY}</span>
                         </div>
                     </div>
 
@@ -132,7 +132,7 @@ function MeasurementsPanel({ annotations, classes, imageDimensions, selectedId, 
                             fontSize: '0.75rem',
                             color: '#666'
                         }}>
-                            Distance from center: <span style={{ color: '#00e0ff' }}>{m.distanceFromCenter}px</span>
+                            Distance from center: <span style={{ color: 'var(--accent)' }}>{m.distanceFromCenter}px</span>
                         </div>
                     )}
                 </div>

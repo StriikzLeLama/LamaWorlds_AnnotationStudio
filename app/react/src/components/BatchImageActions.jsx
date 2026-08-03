@@ -37,9 +37,9 @@ function BatchImageActions({
             bottom: '20px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(0, 224, 255, 0.2)',
+            background: 'rgba(45, 212, 191, 0.2)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 224, 255, 0.5)',
+            border: '1px solid rgba(45, 212, 191, 0.5)',
             borderRadius: '12px',
             padding: '12px 16px',
             zIndex: 10000,
@@ -49,8 +49,8 @@ function BatchImageActions({
             gap: '12px'
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle size={18} style={{ color: '#00e0ff' }} />
-                <span style={{ color: '#00e0ff', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                <CheckCircle size={18} style={{ color: 'var(--accent)' }} />
+                <span style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     {selectedImages.size} image{selectedImages.size > 1 ? 's' : ''} selected
                 </span>
             </div>
@@ -65,10 +65,10 @@ function BatchImageActions({
                         }}
                         style={{
                             padding: '6px 12px',
-                            background: 'rgba(0, 224, 255, 0.2)',
-                            border: '1px solid rgba(0, 224, 255, 0.5)',
+                            background: 'rgba(45, 212, 191, 0.2)',
+                            border: '1px solid rgba(45, 212, 191, 0.5)',
                             borderRadius: '6px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             cursor: 'pointer',
                             fontSize: '0.8rem',
                             display: 'flex',
@@ -92,10 +92,10 @@ function BatchImageActions({
                         }}
                         style={{
                             padding: '6px 12px',
-                            background: 'rgba(0, 224, 255, 0.2)',
-                            border: '1px solid rgba(0, 224, 255, 0.5)',
+                            background: 'rgba(45, 212, 191, 0.2)',
+                            border: '1px solid rgba(45, 212, 191, 0.5)',
                             borderRadius: '6px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             cursor: 'pointer',
                             fontSize: '0.8rem',
                             display: 'flex',

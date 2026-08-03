@@ -136,19 +136,9 @@ function LayoutManager({
     return (
         <div ref={menuRef} style={{ position: 'relative', display: 'inline-block' }}>
             <button
+                type="button"
+                className="btn-ghost"
                 onClick={() => setShowMenu(!showMenu)}
-                style={{
-                    padding: '6px 10px',
-                    background: 'rgba(0, 224, 255, 0.1)',
-                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                    borderRadius: '4px',
-                    color: '#00e0ff',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                }}
                 title="Layout Manager"
             >
                 <Layout size={14} />
@@ -156,21 +146,19 @@ function LayoutManager({
             </button>
 
             {showMenu && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    background: 'rgba(20, 20, 35, 0.95)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    zIndex: 10000,
-                    minWidth: '200px',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
-                }}>
-                    <div style={{ fontSize: '0.75rem', color: '#00e0ff', marginBottom: '8px', fontWeight: 'bold' }}>
+                <div
+                    className="panel"
+                    style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: 6,
+                        padding: 8,
+                        zIndex: 10000,
+                        minWidth: 200,
+                    }}
+                >
+                    <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginBottom: '8px', fontWeight: 'bold' }}>
                         Presets
                     </div>
                     {Object.entries(LAYOUT_PRESETS).map(([key, layout]) => (
@@ -192,17 +180,17 @@ function LayoutManager({
                                 fontSize: '0.75rem',
                                 textAlign: 'left'
                             }}
-                            onMouseEnter={(e) => e.target.style.background = 'rgba(0, 224, 255, 0.1)'}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(45, 212, 191, 0.1)'}
                             onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
-                            <div style={{ fontWeight: 'bold', color: '#00e0ff' }}>{layout.name}</div>
+                            <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{layout.name}</div>
                             <div style={{ fontSize: '0.65rem', color: '#666' }}>{layout.description}</div>
                         </button>
                     ))}
                     
                     {customLayouts.length > 0 && (
                         <>
-                            <div style={{ fontSize: '0.75rem', color: '#00e0ff', marginTop: '12px', marginBottom: '8px', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '12px', marginBottom: '8px', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
                                 Custom
                             </div>
                             {customLayouts.map((layout) => (
@@ -223,7 +211,7 @@ function LayoutManager({
                                             fontSize: '0.75rem',
                                             textAlign: 'left'
                                         }}
-                                        onMouseEnter={(e) => e.target.style.background = 'rgba(0, 224, 255, 0.1)'}
+                                        onMouseEnter={(e) => e.target.style.background = 'rgba(45, 212, 191, 0.1)'}
                                         onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.05)'}
                                     >
                                         {layout.name}
@@ -252,10 +240,10 @@ function LayoutManager({
                             style={{
                                 width: '100%',
                                 padding: '6px 8px',
-                                background: 'rgba(0, 224, 255, 0.1)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: 'rgba(45, 212, 191, 0.1)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '4px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
                                 display: 'flex',
@@ -275,10 +263,10 @@ function LayoutManager({
                             style={{
                                 width: '100%',
                                 padding: '6px 8px',
-                                background: showStatsPanels ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: showStatsPanels ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '4px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
                                 display: 'flex',
@@ -298,10 +286,10 @@ function LayoutManager({
                             style={{
                                 width: '100%',
                                 padding: '6px 8px',
-                                background: 'rgba(0, 224, 255, 0.1)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: 'rgba(45, 212, 191, 0.1)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '4px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
                                 display: 'flex',

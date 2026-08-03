@@ -65,8 +65,8 @@ function KeyboardShortcuts({ onClose }) {
             }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Keyboard size={24} style={{ color: '#00e0ff' }} />
-                        <h2 className="neon-text" style={{ margin: 0 }}>Keyboard Shortcuts</h2>
+                        <Keyboard size={24} style={{ color: 'var(--accent)' }} />
+                        <h2 className="panel-title" style={{ margin: 0 }}>Keyboard Shortcuts</h2>
                     </div>
                     <button
                         onClick={onClose}
@@ -91,16 +91,16 @@ function KeyboardShortcuts({ onClose }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
                     {shortcuts.map((category, idx) => (
                         <div key={idx} style={{
-                            background: 'rgba(0, 224, 255, 0.05)',
+                            background: 'rgba(45, 212, 191, 0.05)',
                             padding: '15px',
                             borderRadius: '8px',
-                            border: '1px solid rgba(0, 224, 255, 0.2)'
+                            border: '1px solid rgba(45, 212, 191, 0.2)'
                         }}>
                             <h3 style={{ 
                                 margin: '0 0 12px 0', 
-                                color: '#00e0ff', 
+                                color: 'var(--accent)', 
                                 fontSize: '1rem',
-                                borderBottom: '1px solid rgba(0, 224, 255, 0.2)',
+                                borderBottom: '1px solid rgba(45, 212, 191, 0.2)',
                                 paddingBottom: '8px'
                             }}>
                                 {category.category}
@@ -116,12 +116,12 @@ function KeyboardShortcuts({ onClose }) {
                                     }}>
                                         <span style={{ fontSize: '0.85rem', color: '#aaa' }}>{item.desc}</span>
                                         <kbd style={{
-                                            background: 'rgba(0, 224, 255, 0.1)',
-                                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                                            background: 'rgba(45, 212, 191, 0.1)',
+                                            border: '1px solid rgba(45, 212, 191, 0.3)',
                                             borderRadius: '4px',
                                             padding: '4px 8px',
                                             fontSize: '0.75rem',
-                                            color: '#00e0ff',
+                                            color: 'var(--accent)',
                                             fontFamily: 'monospace',
                                             minWidth: '80px',
                                             textAlign: 'center'
@@ -138,26 +138,26 @@ function KeyboardShortcuts({ onClose }) {
                 <div style={{ 
                     marginTop: '20px', 
                     padding: '15px', 
-                    background: 'rgba(0, 224, 255, 0.05)', 
+                    background: 'rgba(45, 212, 191, 0.05)', 
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     color: '#aaa',
                     textAlign: 'center'
                 }}>
                     Press <kbd style={{ 
-                        background: 'rgba(0, 224, 255, 0.1)', 
-                        border: '1px solid rgba(0, 224, 255, 0.3)', 
+                        background: 'rgba(45, 212, 191, 0.1)', 
+                        border: '1px solid rgba(45, 212, 191, 0.3)', 
                         borderRadius: '4px', 
                         padding: '2px 6px',
                         fontSize: '0.75rem',
-                        color: '#00e0ff'
+                        color: 'var(--accent)'
                     }}>?</kbd> or <kbd style={{ 
-                        background: 'rgba(0, 224, 255, 0.1)', 
-                        border: '1px solid rgba(0, 224, 255, 0.3)', 
+                        background: 'rgba(45, 212, 191, 0.1)', 
+                        border: '1px solid rgba(45, 212, 191, 0.3)', 
                         borderRadius: '4px', 
                         padding: '2px 6px',
                         fontSize: '0.75rem',
-                        color: '#00e0ff'
+                        color: 'var(--accent)'
                     }}>F1</kbd> to toggle this help
                 </div>
             </div>

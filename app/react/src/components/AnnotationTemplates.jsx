@@ -18,8 +18,8 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
     return (
         <div className="glass-panel" style={{ padding: '15px', margin: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-                <FolderOpen size={16} style={{ color: '#00e0ff' }} />
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#00e0ff' }}>Annotation Templates</h4>
+                <FolderOpen size={16} style={{ color: 'var(--accent)' }} />
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--accent)' }}>Annotation Templates</h4>
             </div>
 
             {!showSaveDialog ? (
@@ -30,10 +30,10 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
                             width: '100%',
                             padding: '8px',
                             marginBottom: '15px',
-                            background: 'rgba(0, 224, 255, 0.1)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            background: 'rgba(45, 212, 191, 0.1)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '6px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -43,10 +43,10 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
                             transition: 'all 0.2s'
                         }}
                         onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(0, 224, 255, 0.2)';
+                            e.target.style.background = 'rgba(45, 212, 191, 0.2)';
                         }}
                         onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(0, 224, 255, 0.1)';
+                            e.target.style.background = 'rgba(45, 212, 191, 0.1)';
                         }}
                     >
                         <Save size={14} />
@@ -70,7 +70,7 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
                                     }}
                                 >
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '0.85rem', color: '#00e0ff', fontWeight: 'bold', marginBottom: '4px' }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: 'bold', marginBottom: '4px' }}>
                                             {template.name}
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#666' }}>
@@ -87,10 +87,10 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
                                             onClick={() => onLoadTemplate(template)}
                                             style={{
                                                 padding: '6px 10px',
-                                                background: 'rgba(0, 224, 255, 0.1)',
-                                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                                background: 'rgba(45, 212, 191, 0.1)',
+                                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                                 borderRadius: '4px',
-                                                color: '#00e0ff',
+                                                color: 'var(--accent)',
                                                 cursor: 'pointer',
                                                 fontSize: '0.75rem',
                                                 display: 'flex',
@@ -164,10 +164,10 @@ function AnnotationTemplates({ templates, onSaveTemplate, onLoadTemplate, onDele
                             style={{
                                 flex: 1,
                                 padding: '8px',
-                                background: 'rgba(0, 224, 255, 0.2)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: 'rgba(45, 212, 191, 0.2)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '6px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.85rem',
                                 display: 'flex',

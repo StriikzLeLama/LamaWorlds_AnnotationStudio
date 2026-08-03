@@ -103,19 +103,9 @@ function WorkflowMode({ currentMode, onModeChange, onToggleQuickDraw, onToggleMe
     return (
         <div ref={menuRef} style={{ position: 'relative', display: 'inline-block' }}>
             <button
+                type="button"
+                className="btn-ghost"
                 onClick={() => setShowMenu(!showMenu)}
-                style={{
-                    padding: '6px 10px',
-                    background: 'rgba(0, 224, 255, 0.1)',
-                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                    borderRadius: '4px',
-                    color: '#00e0ff',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                }}
                 title="Workflow Mode"
             >
                 <Icon size={14} />
@@ -123,20 +113,18 @@ function WorkflowMode({ currentMode, onModeChange, onToggleQuickDraw, onToggleMe
             </button>
 
             {showMenu && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    background: 'rgba(20, 20, 35, 0.95)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    zIndex: 10000,
-                    minWidth: '200px',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
-                }}>
+                <div
+                    className="panel"
+                    style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: 6,
+                        padding: 8,
+                        zIndex: 10000,
+                        minWidth: 200,
+                    }}
+                >
                     {Object.entries(WORKFLOW_MODES).map(([key, mode]) => {
                         const ModeIcon = mode.icon;
                         const isActive = currentMode === key;
@@ -149,13 +137,13 @@ function WorkflowMode({ currentMode, onModeChange, onToggleQuickDraw, onToggleMe
                                     padding: '8px',
                                     marginBottom: '4px',
                                     background: isActive
-                                        ? 'rgba(0, 224, 255, 0.2)'
+                                        ? 'rgba(45, 212, 191, 0.2)'
                                         : 'rgba(255, 255, 255, 0.05)',
                                     border: isActive
-                                        ? '1px solid rgba(0, 224, 255, 0.5)'
+                                        ? '1px solid rgba(45, 212, 191, 0.5)'
                                         : '1px solid rgba(255, 255, 255, 0.1)',
                                     borderRadius: '4px',
-                                    color: isActive ? '#00e0ff' : '#aaa',
+                                    color: isActive ? 'var(--accent)' : '#aaa',
                                     cursor: 'pointer',
                                     fontSize: '0.75rem',
                                     textAlign: 'left',
@@ -165,7 +153,7 @@ function WorkflowMode({ currentMode, onModeChange, onToggleQuickDraw, onToggleMe
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!isActive) {
-                                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
+                                        e.target.style.background = 'rgba(45, 212, 191, 0.1)';
                                     }
                                 }}
                                 onMouseLeave={(e) => {

@@ -86,7 +86,7 @@ function SettingsPanel({ settings, updateSetting, updateSettings, resetSettings,
             }} onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' }}>
-                    <h2 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Settings size={24} />
                         Settings
                     </h2>
@@ -120,10 +120,10 @@ function SettingsPanel({ settings, updateSetting, updateSettings, resetSettings,
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
                                     padding: '8px 16px',
-                                    background: activeTab === tab.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
-                                    border: `1px solid ${activeTab === tab.id ? 'rgba(0, 224, 255, 0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                    background: activeTab === tab.id ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
+                                    border: `1px solid ${activeTab === tab.id ? 'rgba(45, 212, 191, 0.5)' : 'rgba(255,255,255,0.1)'}`,
                                     borderRadius: '6px',
-                                    color: activeTab === tab.id ? '#00e0ff' : '#aaa',
+                                    color: activeTab === tab.id ? 'var(--accent)' : '#aaa',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -224,7 +224,7 @@ function SettingsPanel({ settings, updateSetting, updateSettings, resetSettings,
 function AnnotationSettings({ tempSettings, handleChange, getValue }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Annotation Tools</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Annotation Tools</h3>
             
             <SettingRow
                 label="Snap to Grid"
@@ -289,7 +289,7 @@ function AnnotationSettings({ tempSettings, handleChange, getValue }) {
 function ProductivitySettings({ tempSettings, handleChange, getValue }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Productivity</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Productivity</h3>
             
             <SettingRow
                 label="Auto Advance"
@@ -346,7 +346,7 @@ function ProductivitySettings({ tempSettings, handleChange, getValue }) {
 function ValidationSettings({ tempSettings, handleChange, getValue }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Validation</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Validation</h3>
             
             <SettingRow
                 label="Validate Min Size"
@@ -392,7 +392,7 @@ function ValidationSettings({ tempSettings, handleChange, getValue }) {
 function DisplaySettings({ tempSettings, handleChange, getValue }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Display</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Display</h3>
             
             <SettingRow
                 label="Show Mini Map"
@@ -459,7 +459,7 @@ function DisplaySettings({ tempSettings, handleChange, getValue }) {
             />
             
             <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                <h4 style={{ color: '#00e0ff', fontSize: '0.95rem', marginBottom: '10px' }}>Image Transformations</h4>
+                <h4 style={{ color: 'var(--accent)', fontSize: '0.95rem', marginBottom: '10px' }}>Image Transformations</h4>
                 
                 <SettingRow
                     label="Reset Transform on Image Change"
@@ -500,7 +500,7 @@ function ShortcutsSettings({ tempSettings, handleChange, getValue }) {
     
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Keyboard Shortcuts</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Keyboard Shortcuts</h3>
             <p style={{ color: '#aaa', fontSize: '0.85rem', margin: 0 }}>
                 Click on a shortcut to change it. Press the new key combination.
             </p>
@@ -508,7 +508,7 @@ function ShortcutsSettings({ tempSettings, handleChange, getValue }) {
             {shortcutKeys.map(key => (
                 <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                     <div>
-                        <div style={{ color: '#00e0ff', fontWeight: 'bold' }}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</div>
+                        <div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</div>
                         <div style={{ color: '#888', fontSize: '0.75rem' }}>{getShortcutDescription(key)}</div>
                     </div>
                     <input
@@ -538,10 +538,10 @@ function ShortcutsSettings({ tempSettings, handleChange, getValue }) {
                         }}
                         style={{
                             background: 'rgba(0, 0, 0, 0.3)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '4px',
                             padding: '6px 12px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             fontSize: '0.85rem',
                             minWidth: '150px',
                             textAlign: 'center'
@@ -585,7 +585,7 @@ function ExportSettings({ tempSettings, handleChange, getValue }) {
     
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Export</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Export</h3>
             
             <SettingRow
                 label="Default Export Format"
@@ -647,7 +647,7 @@ function ThemeSettings({ tempSettings, handleChange, getValue }) {
     
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Theme</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Theme</h3>
             
             <SettingRow
                 label="Theme"
@@ -685,10 +685,10 @@ function ThemeSettings({ tempSettings, handleChange, getValue }) {
                                 style={{
                                     flex: 1,
                                     background: 'rgba(0, 0, 0, 0.3)',
-                                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                                    border: '1px solid rgba(45, 212, 191, 0.3)',
                                     borderRadius: '4px',
                                     padding: '6px',
-                                    color: '#00e0ff'
+                                    color: 'var(--accent)'
                                 }}
                             />
                         </div>
@@ -703,7 +703,7 @@ function ThemeSettings({ tempSettings, handleChange, getValue }) {
 function AdvancedSettings({ tempSettings, handleChange, getValue }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <h3 style={{ margin: 0, color: '#00e0ff', fontSize: '1.1rem' }}>Advanced</h3>
+            <h3 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.1rem' }}>Advanced</h3>
             
             <SettingRow
                 label="Enable Scripts"
@@ -784,7 +784,7 @@ function SettingRow({ label, description, value, onChange, type, options, min, m
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ color: '#00e0ff', fontWeight: 'bold', fontSize: '0.9rem' }}>{label}</label>
+                <label style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.9rem' }}>{label}</label>
                 {type === 'checkbox' ? (
                     <input
                         type="checkbox"
@@ -798,10 +798,10 @@ function SettingRow({ label, description, value, onChange, type, options, min, m
                         onChange={(e) => onChange(e.target.value)}
                         style={{
                             background: 'rgba(0, 0, 0, 0.3)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '4px',
                             padding: '6px 12px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             fontSize: '0.85rem',
                             cursor: 'pointer'
                         }}
@@ -820,10 +820,10 @@ function SettingRow({ label, description, value, onChange, type, options, min, m
                         step={step}
                         style={{
                             background: 'rgba(0, 0, 0, 0.3)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '4px',
                             padding: '6px 12px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             fontSize: '0.85rem',
                             width: '150px'
                         }}

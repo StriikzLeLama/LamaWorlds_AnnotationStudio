@@ -65,10 +65,10 @@ function AnnotationGroups({ annotations, groups, onCreateGroup, onDeleteGroup, o
                     onClick={() => setShowCreateDialog(true)}
                     style={{
                         padding: '4px 8px',
-                        background: 'rgba(0, 224, 255, 0.1)',
-                        border: '1px solid rgba(0, 224, 255, 0.3)',
+                        background: 'rgba(45, 212, 191, 0.1)',
+                        border: '1px solid rgba(45, 212, 191, 0.3)',
                         borderRadius: '4px',
-                        color: '#00e0ff',
+                        color: 'var(--accent)',
                         cursor: 'pointer',
                         fontSize: '0.75rem',
                         display: 'flex',
@@ -85,9 +85,9 @@ function AnnotationGroups({ annotations, groups, onCreateGroup, onDeleteGroup, o
             {showCreateDialog ? (
                 <div style={{ 
                     padding: '10px', 
-                    background: 'rgba(0, 224, 255, 0.05)', 
+                    background: 'rgba(45, 212, 191, 0.05)', 
                     borderRadius: '6px', 
-                    border: '1px solid rgba(0, 224, 255, 0.2)',
+                    border: '1px solid rgba(45, 212, 191, 0.2)',
                     marginBottom: '10px'
                 }}>
                     <input
@@ -121,10 +121,10 @@ function AnnotationGroups({ annotations, groups, onCreateGroup, onDeleteGroup, o
                             style={{
                                 flex: 1,
                                 padding: '6px',
-                                background: 'rgba(0, 224, 255, 0.2)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: 'rgba(45, 212, 191, 0.2)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '4px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
                                 display: 'flex',
@@ -172,11 +172,11 @@ function AnnotationGroups({ annotations, groups, onCreateGroup, onDeleteGroup, o
                             style={{
                                 padding: '10px',
                                 background: selectedGroupId === group.id 
-                                    ? 'rgba(0, 224, 255, 0.15)' 
+                                    ? 'rgba(45, 212, 191, 0.15)' 
                                     : 'rgba(255, 255, 255, 0.02)',
                                 borderRadius: '6px',
                                 border: selectedGroupId === group.id
-                                    ? '1px solid rgba(0, 224, 255, 0.5)'
+                                    ? '1px solid rgba(45, 212, 191, 0.5)'
                                     : '1px solid rgba(255, 255, 255, 0.1)',
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -189,7 +189,7 @@ function AnnotationGroups({ annotations, groups, onCreateGroup, onDeleteGroup, o
                                 <div style={{ 
                                     fontSize: '0.85rem', 
                                     fontWeight: 'bold', 
-                                    color: selectedGroupId === group.id ? '#00e0ff' : '#fff',
+                                    color: selectedGroupId === group.id ? 'var(--accent)' : '#fff',
                                     marginBottom: '4px'
                                 }}>
                                     {group.name}

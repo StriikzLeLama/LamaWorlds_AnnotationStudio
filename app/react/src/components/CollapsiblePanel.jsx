@@ -1,96 +1,62 @@
 /**
- * @fileoverview CollapsiblePanel Component - Reusable Collapsible Panel
- * 
- * This component provides a reusable collapsible panel with:
- * - Collapse/expand functionality
- * - Customizable header and container styles
- * - Icon support
- * - Smooth animations
- * 
- * @component
- * @param {Object} props - Component props
- * @param {string} props.title - Panel title
- * @param {React.ComponentType} props.icon - Icon component
- * @param {React.ReactNode} props.children - Panel content
- * @param {boolean} props.defaultCollapsed - Initial collapsed state
- * @param {Object} props.headerStyle - Custom header styles
- * @param {Object} props.containerStyle - Custom container styles (supports background, backdropFilter)
- * @returns {JSX.Element} The rendered collapsible panel component
+ * Panneau repliable réutilisable (stats, validation, analytics…).
  */
-
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-function CollapsiblePanel({ title, icon: Icon, children, defaultCollapsed = false, headerStyle = {}, containerStyle = {} }) {
+function CollapsiblePanel({
+    title,
+    icon: Icon,
+    children,
+    defaultCollapsed = false,
+    headerStyle = {},
+    containerStyle = {},
+}) {
     const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
     return (
-        <div className="glass-panel" style={{ 
-            width: '100%', 
-            padding: isCollapsed ? '8px 15px' : '15px', 
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: 'all 0.3s ease',
-            background: containerStyle.background || 'rgba(20, 20, 35, 0.3)',
-            backdropFilter: containerStyle.backdropFilter || 'blur(8px)',
-            ...containerStyle
-        }}>
-            <div 
-                style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
+        <div
+            className="glass-panel"
+            style={{
+                width: '100%',
+                padding: isCollapsed ? '8px 12px' : '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'padding 160ms ease',
+                ...containerStyle,
+            }}
+        >
+            <div
+                className="panel-header"
+                style={{
+                    marginBottom: isCollapsed ? 0 : 10,
                     cursor: 'pointer',
-                    userSelect: 'none',
-                    marginBottom: isCollapsed ? 0 : '10px',
-                    ...headerStyle
+                    ...headerStyle,
                 }}
                 onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {Icon && <Icon size={18} style={{ color: '#00e0ff' }} />}
-                    <h3 className="neon-text" style={{ margin: 0, fontSize: '1rem' }}>{title}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {Icon && <Icon size={16} style={{ color: 'var(--accent)' }} />}
+                    <h3 className="panel-title" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                        {title}
+                    </h3>
                 </div>
                 <button
+                    type="button"
+                    className="btn-icon"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#00e0ff',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '4px',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                    }}
-                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+                    title={isCollapsed ? 'Développer' : 'Réduire'}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>
             </div>
-            {!isCollapsed && (
-                <div style={{ 
-                    overflow: isCollapsed ? 'hidden' : 'visible',
-                    maxHeight: isCollapsed ? 0 : 'none',
-                    transition: 'max-height 0.3s ease'
-                }}>
-                    {children}
-                </div>
-            )}
+
+            {!isCollapsed && <div style={{ flex: 1, minHeight: 0 }}>{children}</div>}
         </div>
     );
 }
 
 export default CollapsiblePanel;
-

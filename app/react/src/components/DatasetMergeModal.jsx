@@ -130,7 +130,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                 backdropFilter: 'blur(10px)'
             }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h2 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Merge size={24} />
                         Merge Datasets
                     </h2>
@@ -209,7 +209,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                                 borderRadius: '6px',
                                 border: '1px solid rgba(255, 255, 255, 0.1)'
                             }}>
-                                <FolderOpen size={16} style={{ color: '#00e0ff' }} />
+                                <FolderOpen size={16} style={{ color: 'var(--accent)' }} />
                                 <span style={{ flex: 1, fontSize: '0.85rem', color: '#aaa', wordBreak: 'break-all' }}>
                                     {path}
                                 </span>
@@ -260,7 +260,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                                 fontSize: '0.9rem',
                                 outline: 'none'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                             onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                         />
                         <button
@@ -277,12 +277,12 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                 {progress && (
                     <div style={{
                         padding: '12px',
-                        background: 'rgba(0, 224, 255, 0.1)',
-                        border: '1px solid rgba(0, 224, 255, 0.3)',
+                        background: 'rgba(45, 212, 191, 0.1)',
+                        border: '1px solid rgba(45, 212, 191, 0.3)',
                         borderRadius: '6px',
                         marginBottom: '15px'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem', color: '#00e0ff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--accent)' }}>
                             <span>{progress.message}</span>
                             <span>{progress.current} / {progress.total}</span>
                         </div>
@@ -290,7 +290,7 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                             <div style={{
                                 width: `${(progress.current / progress.total) * 100}%`,
                                 height: '100%',
-                                background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
+                                background: 'linear-gradient(90deg, var(--accent), #56b0ff)',
                                 transition: 'width 0.3s ease'
                             }}></div>
                         </div>
@@ -333,8 +333,8 @@ function DatasetMergeModal({ isOpen, onClose, onMergeComplete }) {
                     </button>
                 </div>
 
-                <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(0, 224, 255, 0.05)', borderRadius: '6px', fontSize: '0.8rem', color: '#888' }}>
-                    <div style={{ fontWeight: 'bold', color: '#00e0ff', marginBottom: '6px' }}>What will be merged:</div>
+                <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(45, 212, 191, 0.05)', borderRadius: '6px', fontSize: '0.8rem', color: '#888' }}>
+                    <div style={{ fontWeight: 'bold', color: 'var(--accent)', marginBottom: '6px' }}>What will be merged:</div>
                     <ul style={{ margin: 0, paddingLeft: '20px' }}>
                         <li>All images from all datasets</li>
                         <li>All annotations (labels will be updated to match merged classes)</li>

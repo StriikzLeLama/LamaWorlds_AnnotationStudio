@@ -23,7 +23,7 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                 annotationsByClass[cls.id] = {
                     name: cls.name || `Class ${cls.id}`,
                     count: 0,
-                    color: cls.color || '#00e0ff'
+                    color: cls.color || 'var(--accent)'
                 };
             }
         });
@@ -76,8 +76,8 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Eye size={18} style={{ color: '#00e0ff' }} />
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#00e0ff' }}>Export Preview</h3>
+                        <Eye size={18} style={{ color: 'var(--accent)' }} />
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent)' }}>Export Preview</h3>
                     </div>
                     <button
                         onClick={onClose}
@@ -98,10 +98,10 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                 </div>
 
                 {/* Export Format */}
-                <div style={{ padding: '12px', background: 'rgba(0, 224, 255, 0.05)', borderRadius: '6px', border: '1px solid rgba(0, 224, 255, 0.2)' }}>
+                <div style={{ padding: '12px', background: 'rgba(45, 212, 191, 0.05)', borderRadius: '6px', border: '1px solid rgba(45, 212, 191, 0.2)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <FileText size={14} style={{ color: '#00e0ff' }} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>Export Format</span>
+                        <FileText size={14} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)' }}>Export Format</span>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#aaa' }}>
                         {exportStats.format} (YOLO format - .txt files)
@@ -111,21 +111,21 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                 {/* Statistics */}
                 <div style={{ padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                        <ImageIcon size={14} style={{ color: '#00e0ff' }} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>Dataset Statistics</span>
+                        <ImageIcon size={14} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)' }}>Dataset Statistics</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: '#aaa' }}>Total Images:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{exportStats.totalImages}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{exportStats.totalImages}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: '#aaa' }}>Annotated Images:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{exportStats.annotatedImages}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{exportStats.annotatedImages}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: '#aaa' }}>Total Annotations:</span>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{exportStats.totalAnnotations}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{exportStats.totalAnnotations}</span>
                         </div>
                     </div>
                 </div>
@@ -133,7 +133,7 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                 {/* Annotations by Class */}
                 {Object.keys(exportStats.annotationsByClass).length > 0 && (
                     <div style={{ padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px' }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff', marginBottom: '10px' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '10px' }}>
                             Annotations by Class
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -163,7 +163,7 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                                             }}></div>
                                             <span style={{ fontSize: '0.8rem', color: '#aaa' }}>{cls.name}</span>
                                         </div>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00e0ff' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)' }}>
                                             {cls.count}
                                         </span>
                                     </div>
@@ -192,10 +192,10 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                         style={{
                             flex: 1,
                             padding: '10px',
-                            background: 'rgba(0, 224, 255, 0.2)',
-                            border: '1px solid rgba(0, 224, 255, 0.5)',
+                            background: 'rgba(45, 212, 191, 0.2)',
+                            border: '1px solid rgba(45, 212, 191, 0.5)',
                             borderRadius: '6px',
-                            color: '#00e0ff',
+                            color: 'var(--accent)',
                             cursor: 'pointer',
                             fontSize: '0.9rem',
                             fontWeight: 'bold',
@@ -206,10 +206,10 @@ function ExportPreview({ images, annotations, classes, datasetPath, onExport, on
                             transition: 'all 0.2s'
                         }}
                         onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(0, 224, 255, 0.3)';
+                            e.target.style.background = 'rgba(45, 212, 191, 0.3)';
                         }}
                         onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(0, 224, 255, 0.2)';
+                            e.target.style.background = 'rgba(45, 212, 191, 0.2)';
                         }}
                     >
                         <Download size={16} />

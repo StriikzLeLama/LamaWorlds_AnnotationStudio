@@ -20,10 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, CheckCircle, Circle, Image as ImageIcon, TrendingUp, Database } from 'lucide-react';
 import CollapsiblePanel from './CollapsiblePanel';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:8000';
-const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+import api from '../api/client';
 
 function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages }) {
     const [datasetStats, setDatasetStats] = useState(null);
@@ -113,20 +110,20 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                 {/* Dataset Progress */}
                 <div style={{ 
                     padding: '10px', 
-                    background: 'rgba(0, 224, 255, 0.05)', 
+                    background: 'rgba(45, 212, 191, 0.05)', 
                     borderRadius: '6px', 
-                    border: '1px solid rgba(0, 224, 255, 0.2)',
+                    border: '1px solid rgba(45, 212, 191, 0.2)',
                     width: '100%',
                     boxSizing: 'border-box',
                     overflow: 'hidden'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <Database size={14} style={{ color: '#00e0ff' }} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>Dataset Progress</span>
+                        <Database size={14} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)' }}>Dataset Progress</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                         <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Annotated</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)' }}>
                             {currentAnnotatedCount} / {totalImages}
                         </span>
                     </div>
@@ -141,7 +138,7 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                     <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '6px' }}>Current Image:</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <span style={{ fontSize: '0.85rem', color: '#aaa' }}>Annotations</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00e0ff' }}>{annotations.length}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent)' }}>{annotations.length}</span>
                     </div>
                     {totalImages > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#666' }}>
@@ -210,7 +207,7 @@ function StatsPanel({ images, annotations, classes, datasetPath, annotatedImages
                                                     transition: 'width 0.3s ease'
                                                 }}></div>
                                             </div>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00e0ff', minWidth: '20px', textAlign: 'right' }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)', minWidth: '20px', textAlign: 'right' }}>
                                                 {cls.count}
                                             </span>
                                         </div>

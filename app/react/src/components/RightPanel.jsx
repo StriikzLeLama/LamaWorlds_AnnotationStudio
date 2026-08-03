@@ -1,56 +1,9 @@
 /**
- * @fileoverview RightPanel Component - Image List and Export Management
- * 
- * This component provides the right sidebar with:
- * - Image list/grid view with virtualization for performance
- * - Search and filtering capabilities
- * - Export menu with history
- * - Image tags and metadata
- * - Batch image selection
- * - Quick actions on hover
- * - Compact/expanded mode toggle
- * 
- * @component
- * @param {Object} props - Component props
- * @param {Array<string>} props.images - Array of image file paths
- * @param {number} props.currentIndex - Currently selected image index
- * @param {Function} props.setIndex - Function to change image index
- * @param {Array<Object>} props.annotations - Current image annotations
- * @param {Function} props.onDeleteAnnotation - Function to delete annotation
- * @param {Function} props.onExport - Function to export dataset
- * @param {Array<Object>} props.classes - Annotation classes
- * @param {string} props.datasetPath - Current dataset path
- * @param {Function} props.onChangeAnnotationClass - Function to change annotation class
- * @param {string|null} props.selectedAnnotationId - Currently selected annotation ID
- * @param {Function} props.onSelectAnnotation - Function to select annotation
- * @param {string} props.searchQuery - Current search query
- * @param {Function} props.setSearchQuery - Function to set search query
- * @param {boolean|null} props.filterAnnotated - Filter by annotation status
- * @param {Function} props.setFilterAnnotated - Function to set annotation filter
- * @param {Set<string>} props.annotatedImages - Set of annotated image paths
- * @param {number|null} props.filterClassId - Filter by class ID
- * @param {Function} props.setFilterClassId - Function to set class filter
- * @param {React.MutableRefObject<Object>} props.annotationCache - Annotation cache ref
- * @param {Function} props.onDeleteImage - Function to delete image
- * @param {Function} props.setImages - Function to update images array
- * @param {Object} props.annotationComments - Annotation comments object
- * @param {Function} props.onUpdateAnnotationComment - Function to update comment
- * @param {Object} props.imageTags - Image tags object
- * @param {Function} props.onUpdateImageTag - Function to update image tags
- * @param {boolean} props.searchInAnnotations - Search in annotations toggle
- * @param {Function} props.setSearchInAnnotations - Function to toggle search in annotations
- * @param {Function} props.onOpenDatasetMerge - Function to open dataset merge modal
- * @param {Set<string>} props.selectedImages - Set of selected image paths
- * @param {Function} props.onToggleImageSelection - Function to toggle image selection
- * @param {Function} props.onImagePreview - Function to show image preview
- * @returns {JSX.Element} The rendered right panel component
+ * Panneau droit — liste d'images, annotations courantes, filtres et export.
  */
 import React, { useRef, useEffect, useState, useMemo, createRef } from 'react';
 import { Image as ImageIcon, Box, Search, Filter, CheckCircle, Circle, X, Trash2, SortAsc, SortDesc, Grid, List, Tag, ChevronDown, ChevronUp, Download, Upload, FileText, Merge, Eye, FileJson, FileCode, History, Maximize2, Minimize2, Zap, Check } from 'lucide-react';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:8000';
-const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+import api from '../api/client';
 
 function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnotation, onExport, classes, datasetPath, onChangeAnnotationClass, selectedAnnotationId, onSelectAnnotation, searchQuery, setSearchQuery, filterAnnotated, setFilterAnnotated, annotatedImages, filterClassId, setFilterClassId, annotationCache, onDeleteImage, setImages, annotationComments = {}, onUpdateAnnotationComment, imageTags = {}, onUpdateImageTag, searchInAnnotations = false, setSearchInAnnotations, onOpenDatasetMerge, selectedImages = new Set(), onToggleImageSelection, onImagePreview }) {
     // State for class selector dropdowns (one per annotation)
@@ -462,52 +415,30 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
     }, [filteredImages, images]);
 
     return (
-        <div className="glass-panel" style={{ 
-            width: isCollapsed ? '60px' : '320px', 
-            margin: '10px', 
-            padding: isCollapsed ? '8px 15px' : '15px',
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: 'all 0.3s ease',
-            overflow: isCollapsed ? 'hidden' : 'visible'
-        }}>
-            <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: isCollapsed ? 'center' : 'space-between',
-                marginBottom: isCollapsed ? 0 : '10px',
-                cursor: 'pointer',
-                userSelect: 'none',
-                borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                paddingBottom: isCollapsed ? 0 : '10px'
-            }}
-            onClick={() => setIsCollapsed(!isCollapsed)}
+        <div
+            className={`glass-panel side-panel${isCollapsed ? ' is-collapsed' : ''}`}
+            style={{ width: isCollapsed ? 56 : 320 }}
+        >
+            <div
+                className="panel-header"
+                style={{
+                    justifyContent: isCollapsed ? 'center' : 'space-between',
+                    marginBottom: isCollapsed ? 0 : 12,
+                    cursor: 'pointer',
+                    borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                    paddingBottom: isCollapsed ? 0 : 10,
+                }}
+                onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                {!isCollapsed && <h4 className="neon-text" style={{ margin: 0 }}>Images & Annotations</h4>}
+                {!isCollapsed && <h4 className="panel-title">Images & annotations</h4>}
                 <button
+                    type="button"
+                    className="btn-icon"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#00e0ff',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '4px',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                    }}
-                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+                    title={isCollapsed ? 'Développer' : 'Réduire'}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>
@@ -515,9 +446,11 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
 
             {!isCollapsed && (
                 <>
-            {/* Annotations List */}
-            <div style={{ padding: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', height: '40%' }}>
-                <h4 className="neon-text" style={{ margin: '0 0 10px 0' }}>Annotations ({Array.isArray(annotations) ? annotations.length : 0})</h4>
+            {/* Liste des annotations de l'image courante */}
+            <div style={{ padding: '8px 0 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', height: '40%' }}>
+                <h4 className="panel-title" style={{ marginBottom: 10 }}>
+                    Annotations ({Array.isArray(annotations) ? annotations.length : 0})
+                </h4>
                 <div style={{ height: 'calc(100% - 30px)', overflowY: 'auto' }}>
                     {Array.isArray(annotations) && annotations.map((ann, i) => {
                         const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
@@ -535,7 +468,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     padding: '8px', 
                                     fontSize: '0.9rem', 
                                     borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                    background: isSelected ? 'rgba(0, 224, 255, 0.1)' : 'transparent',
+                                    background: isSelected ? 'rgba(45, 212, 191, 0.1)' : 'transparent',
                                     cursor: 'pointer',
                                     borderRadius: '4px',
                                     marginBottom: '2px',
@@ -581,7 +514,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             marginTop: '4px',
                                             background: 'rgba(20, 20, 35, 0.95)',
                                             backdropFilter: 'blur(10px)',
-                                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                                            border: '1px solid rgba(45, 212, 191, 0.3)',
                                             borderRadius: '8px',
                                             padding: '8px',
                                             zIndex: 1000,
@@ -637,8 +570,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                                 padding: '6px 8px',
                                                                 cursor: 'pointer',
                                                                 borderRadius: '4px',
-                                                                background: ann.class_id === c.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
-                                                                border: ann.class_id === c.id ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                                background: ann.class_id === c.id ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
+                                                                border: ann.class_id === c.id ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid transparent',
                                                                 marginBottom: '2px',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
@@ -658,7 +591,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                         >
                                                             <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}` }}></div>
                                                             <span>{c.name}</span>
-                                                            {ann.class_id === c.id && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                                            {ann.class_id === c.id && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
                                                         </div>
                                                     ))
                                                 ) : (
@@ -733,12 +666,12 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 <div key={ann.id} style={{ 
                                     padding: '6px', 
                                     marginBottom: '4px', 
-                                    background: 'rgba(0, 224, 255, 0.05)', 
+                                    background: 'rgba(45, 212, 191, 0.05)', 
                                     borderRadius: '4px',
                                     fontSize: '0.75rem',
                                     color: '#aaa'
                                 }}>
-                                    <div style={{ color: '#00e0ff', marginBottom: '2px' }}>
+                                    <div style={{ color: 'var(--accent)', marginBottom: '2px' }}>
                                         {Array.isArray(classes) ? (classes.find(c => c && c.id === ann.class_id)?.name || 'Unknown') : 'Unknown'}
                                     </div>
                                     <div>{annotationComments[ann.id]}</div>
@@ -765,7 +698,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             fontSize: '0.75rem',
                                             outline: 'none'
                                         }}
-                                        onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                                        onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                                         onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                                     />
                                 </div>
@@ -778,7 +711,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
             {/* Image List */}
             <div style={{ flex: 1, padding: '15px', overflowY: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <h4 className="neon-text" style={{ margin: 0, fontSize: '0.95rem' }}>
+                    <h4 className="panel-title" style={{ margin: 0, fontSize: '0.95rem' }}>
                         Images ({filteredImages.length}/{images.length})
                     </h4>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -788,10 +721,10 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 onClick={() => setViewMode('list')}
                                 style={{
                                     padding: '4px 8px',
-                                    background: viewMode === 'list' ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
+                                    background: viewMode === 'list' ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
                                     border: 'none',
                                     borderRadius: '4px',
-                                    color: viewMode === 'list' ? '#00e0ff' : '#aaa',
+                                    color: viewMode === 'list' ? 'var(--accent)' : '#aaa',
                                     cursor: 'pointer',
                                     fontSize: '0.75rem',
                                     display: 'flex',
@@ -805,10 +738,10 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 onClick={() => setViewMode('grid')}
                                 style={{
                                     padding: '4px 8px',
-                                    background: viewMode === 'grid' ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
+                                    background: viewMode === 'grid' ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
                                     border: 'none',
                                     borderRadius: '4px',
-                                    color: viewMode === 'grid' ? '#00e0ff' : '#aaa',
+                                    color: viewMode === 'grid' ? 'var(--accent)' : '#aaa',
                                     cursor: 'pointer',
                                     fontSize: '0.75rem',
                                     display: 'flex',
@@ -827,11 +760,11 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 setSortOrder(orders[(currentIdx + 1) % orders.length]);
                             }}
                             style={{
-                                background: 'rgba(0, 224, 255, 0.1)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                background: 'rgba(45, 212, 191, 0.1)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '4px',
                                 padding: '4px 8px',
-                                color: '#00e0ff',
+                                color: 'var(--accent)',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
                                 display: 'flex',
@@ -864,7 +797,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 fontSize: '0.85rem',
                                 outline: 'none'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                             onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                         />
                     </div>
@@ -894,15 +827,15 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                     {showAdvancedFilters && (
                         <div style={{ 
                             padding: '10px', 
-                            background: 'rgba(0, 224, 255, 0.05)', 
+                            background: 'rgba(45, 212, 191, 0.05)', 
                             borderRadius: '6px', 
-                            border: '1px solid rgba(0, 224, 255, 0.2)',
+                            border: '1px solid rgba(45, 212, 191, 0.2)',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '8px',
                             fontSize: '0.75rem'
                         }}>
-                            <div style={{ fontWeight: 'bold', color: '#00e0ff', marginBottom: '4px' }}>Filter by Annotation Size:</div>
+                            <div style={{ fontWeight: 'bold', color: 'var(--accent)', marginBottom: '4px' }}>Filter by Annotation Size:</div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                                 <input
                                     type="number"
@@ -933,7 +866,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     }}
                                 />
                             </div>
-                            <div style={{ fontWeight: 'bold', color: '#00e0ff', marginTop: '4px' }}>Filter by Aspect Ratio:</div>
+                            <div style={{ fontWeight: 'bold', color: 'var(--accent)', marginTop: '4px' }}>Filter by Aspect Ratio:</div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                                 <input
                                     type="number"
@@ -997,8 +930,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     flex: 1,
                                     minWidth: '60px',
                                     padding: '4px 8px',
-                                    background: filterAnnotated === null ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                    border: filterAnnotated === null ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                                    background: filterAnnotated === null ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                    border: filterAnnotated === null ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
                                     borderRadius: '4px',
                                     color: 'white',
                                     fontSize: '0.75rem',
@@ -1014,8 +947,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 flex: 1,
                                 minWidth: '60px',
                                 padding: '4px 8px',
-                                background: filterAnnotated === true ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                border: filterAnnotated === true ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                                background: filterAnnotated === true ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                border: filterAnnotated === true ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
                                 borderRadius: '4px',
                                 color: 'white',
                                 fontSize: '0.75rem',
@@ -1036,8 +969,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 flex: 1,
                                 minWidth: '60px',
                                 padding: '4px 8px',
-                                background: filterAnnotated === false ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                border: filterAnnotated === false ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                                background: filterAnnotated === false ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                border: filterAnnotated === false ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
                                 borderRadius: '4px',
                                 color: 'white',
                                 fontSize: '0.75rem',
@@ -1126,7 +1059,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     marginTop: '4px',
                                     background: 'rgba(20, 20, 35, 0.95)',
                                     backdropFilter: 'blur(10px)',
-                                    border: '1px solid rgba(0, 224, 255, 0.3)',
+                                    border: '1px solid rgba(45, 212, 191, 0.3)',
                                     borderRadius: '8px',
                                     padding: '8px',
                                     zIndex: 1000,
@@ -1172,8 +1105,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                 padding: '6px 8px',
                                                 cursor: 'pointer',
                                                 borderRadius: '4px',
-                                                background: filterClassId === null ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
-                                                border: filterClassId === null ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                background: filterClassId === null ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
+                                                border: filterClassId === null ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid transparent',
                                                 marginBottom: '2px',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -1192,7 +1125,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                             }}
                                         >
                                             <span>All Classes</span>
-                                            {filterClassId === null && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                            {filterClassId === null && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
                                         </div>
                                         
                                         {/* Filtered classes */}
@@ -1209,8 +1142,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                         padding: '6px 8px',
                                                         cursor: 'pointer',
                                                         borderRadius: '4px',
-                                                        background: filterClassId === c.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
-                                                        border: filterClassId === c.id ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid transparent',
+                                                        background: filterClassId === c.id ? 'rgba(45, 212, 191, 0.2)' : 'transparent',
+                                                        border: filterClassId === c.id ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid transparent',
                                                         marginBottom: '2px',
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -1230,7 +1163,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                                 >
                                                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}` }}></div>
                                                     <span>{c.name}</span>
-                                                    {filterClassId === c.id && <Check size={14} style={{ marginLeft: 'auto', color: '#00e0ff' }} />}
+                                                    {filterClassId === c.id && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--accent)' }} />}
                                                 </div>
                                             ))
                                         ) : (
@@ -1249,7 +1182,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     fontSize: '0.7rem',
-                                    color: '#00e0ff',
+                                    color: 'var(--accent)',
                                     pointerEvents: 'none'
                                 }}>
                                     Loading...
@@ -1310,7 +1243,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             style={{
                                 flex: 1,
                                 padding: '6px',
-                                background: compactMode ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                background: compactMode ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
                                 border: '1px solid rgba(255, 255, 255, 0.2)',
                                 borderRadius: '4px',
                                 color: '#aaa',
@@ -1360,7 +1293,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 marginBottom: '4px',
                                 background: 'rgba(20, 20, 35, 0.95)',
                                 backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '8px',
                                 padding: '6px',
                                 zIndex: 1000,
@@ -1577,8 +1510,8 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: '6px',
-                                    background: 'rgba(0, 224, 255, 0.15)',
-                                    border: '1px solid rgba(0, 224, 255, 0.5)'
+                                    background: 'rgba(45, 212, 191, 0.15)',
+                                    border: '1px solid rgba(45, 212, 191, 0.5)'
                                 }} 
                                 onClick={onOpenDatasetMerge}
                                 title="Merge multiple datasets (Ctrl+M)"
@@ -1596,14 +1529,14 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                             padding: '8px',
                             background: 'rgba(20, 20, 35, 0.95)',
                             backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '8px',
                             maxHeight: '200px',
                             overflowY: 'auto',
                             maxWidth: '100%',
                             boxSizing: 'border-box'
                         }}>
-                            <div style={{ fontSize: '0.75rem', color: '#00e0ff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <History size={14} />
                                 Recent Exports
                             </div>
@@ -1632,10 +1565,10 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                         }}
                                         style={{
                                             padding: '2px 6px',
-                                            background: 'rgba(0, 224, 255, 0.1)',
-                                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                                            background: 'rgba(45, 212, 191, 0.1)',
+                                            border: '1px solid rgba(45, 212, 191, 0.3)',
                                             borderRadius: '4px',
-                                            color: '#00e0ff',
+                                            color: 'var(--accent)',
                                             cursor: 'pointer',
                                             fontSize: '0.65rem'
                                         }}
@@ -1674,7 +1607,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                         position: 'relative'
                     }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                            <h3 className="neon-text" style={{ margin: 0 }}>Edit Tags</h3>
+                            <h3 className="panel-title" style={{ margin: 0 }}>Edit Tags</h3>
                             <button
                                 onClick={() => setShowTagEditor(false)}
                                 style={{
@@ -1714,7 +1647,7 @@ function RightPanel({ images, currentIndex, setIndex, annotations, onDeleteAnnot
                                 marginBottom: '15px',
                                 boxSizing: 'border-box'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                             onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
@@ -1867,14 +1800,14 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                             position: 'relative',
                             cursor: 'pointer',
                             background: isCurrent 
-                                ? 'rgba(0, 224, 255, 0.15)' 
+                                ? 'rgba(45, 212, 191, 0.15)' 
                                 : selectedImages.has(img)
-                                ? 'rgba(0, 224, 255, 0.1)'
+                                ? 'rgba(45, 212, 191, 0.1)'
                                 : 'rgba(255, 255, 255, 0.05)',
                             border: isCurrent 
-                                ? '2px solid #00e0ff' 
+                                ? '2px solid var(--accent)' 
                                 : selectedImages.has(img)
-                                ? '2px solid rgba(0, 224, 255, 0.5)'
+                                ? '2px solid rgba(45, 212, 191, 0.5)'
                                 : '1px solid rgba(255, 255, 255, 0.1)',
                             borderRadius: '8px',
                             overflow: 'hidden',
@@ -1900,8 +1833,8 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                                 left: '4px',
                                 width: '20px',
                                 height: '20px',
-                                background: 'rgba(0, 224, 255, 0.9)',
-                                border: '2px solid #00e0ff',
+                                background: 'rgba(45, 212, 191, 0.9)',
+                                border: '2px solid var(--accent)',
                                 borderRadius: '4px',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1916,7 +1849,7 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                                 position: 'absolute',
                                 top: '4px',
                                 right: '4px',
-                                background: 'rgba(0, 224, 255, 0.8)',
+                                background: 'rgba(45, 212, 191, 0.8)',
                                 color: 'white',
                                 fontSize: '0.7rem',
                                 padding: '2px 6px',
@@ -1933,7 +1866,7 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                                 bottom: 0,
                                 left: 0,
                                 right: 0,
-                                background: 'rgba(0, 224, 255, 0.9)',
+                                background: 'rgba(45, 212, 191, 0.9)',
                                 color: 'white',
                                 fontSize: '0.7rem',
                                 padding: '4px',
@@ -1962,7 +1895,7 @@ function VirtualizedImageGrid({ images, filteredToOriginal, currentIndex, setInd
                                     }}
                                     style={{
                                         padding: '4px',
-                                        background: 'rgba(0, 224, 255, 0.9)',
+                                        background: 'rgba(45, 212, 191, 0.9)',
                                         border: 'none',
                                         borderRadius: '4px',
                                         color: 'white',
@@ -2075,11 +2008,11 @@ function VirtualizedImageList({ images, filteredToOriginal, currentIndex, setInd
                         }}
                         style={{
                             padding: '8px',
-                            background: isCurrent ? 'rgba(0, 224, 255, 0.1)' : 'transparent',
-                            borderLeft: isCurrent ? '3px solid #00e0ff' : 'none',
+                            background: isCurrent ? 'rgba(45, 212, 191, 0.1)' : 'transparent',
+                            borderLeft: isCurrent ? '3px solid var(--accent)' : 'none',
                             cursor: 'pointer',
                             fontSize: '0.85rem',
-                            color: isCurrent ? '#00e0ff' : '#aaa',
+                            color: isCurrent ? 'var(--accent)' : '#aaa',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
@@ -2093,15 +2026,15 @@ function VirtualizedImageList({ images, filteredToOriginal, currentIndex, setInd
                             <div style={{
                                 width: '16px',
                                 height: '16px',
-                                background: 'rgba(0, 224, 255, 0.3)',
-                                border: '2px solid #00e0ff',
+                                background: 'rgba(45, 212, 191, 0.3)',
+                                border: '2px solid var(--accent)',
                                 borderRadius: '4px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 flexShrink: 0
                             }}>
-                                <CheckCircle size={12} style={{ color: '#00e0ff' }} />
+                                <CheckCircle size={12} style={{ color: 'var(--accent)' }} />
                             </div>
                         )}
                         <ImageIcon size={16} style={{ flexShrink: 0 }} />
@@ -2110,7 +2043,7 @@ function VirtualizedImageList({ images, filteredToOriginal, currentIndex, setInd
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {hasAnnotations && (
-                                <CheckCircle size={14} style={{ color: '#00e0ff', flexShrink: 0 }} />
+                                <CheckCircle size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                             )}
                             {hoveredImageIndex === filteredIdx && !isCurrent && onDeleteImage && (
                                 <button

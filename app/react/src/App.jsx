@@ -1,25 +1,13 @@
 /**
- * @fileoverview Main Application Component
- * 
- * Lama Worlds Annotation Studio - Main React Application
- * 
- * This is the root component of the application. It manages:
- * - Dataset loading and management
- * - Image navigation and annotation state
- * - UI state (panels, modals, layouts)
- * - Communication with the FastAPI backend
- * - Keyboard shortcuts and user interactions
- * 
- * @author StriikzLeLama
- * @version 1.1.0
+ * App racine — orchestre dataset, annotations, panneaux et raccourcis.
+ * État central volontairement ici (outil desktop mono-écran) ; le client API
+ * est partagé via ./api/client.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Settings, Eye, EyeOff, BarChart3, Layout, FolderOpen } from 'lucide-react';
+import { Settings, Eye, EyeOff, FolderOpen } from 'lucide-react';
 
-// Component Imports
 import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
 import AnnotationCanvas from './components/AnnotationCanvas';
@@ -29,9 +17,6 @@ import AnalyticsPanel from './components/AnalyticsPanel';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
 import SettingsPanel from './components/SettingsPanel';
 import MeasurementsPanel from './components/MeasurementsPanel';
-import AnnotationTemplates from './components/AnnotationTemplates';
-import AnnotationGroups from './components/AnnotationGroups';
-import ExportPreview from './components/ExportPreview';
 import VisionLLMModal from './components/VisionLLMModal';
 import DatasetMergeModal from './components/DatasetMergeModal';
 import LayoutManager from './components/LayoutManager';
@@ -42,51 +27,10 @@ import BatchImageActions from './components/BatchImageActions';
 import ImagePreviewTooltip from './components/ImagePreviewTooltip';
 import ThemeManager from './components/ThemeManager';
 
-// Hooks
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useSettings, loadSettings } from './hooks/useSettings';
+import api from './api/client';
 import './styles/index.css';
-
-// ============================================================================
-// API Configuration
-// ============================================================================
-
-/**
- * Backend API URL
- * @constant {string}
- */
-const API_URL = 'http://localhost:8000';
-
-/**
- * Axios instance configured for backend communication
- * @constant {AxiosInstance}
- */
-const api = axios.create({ baseURL: API_URL, timeout: 10000 });
-
-/**
- * Response interceptor for error handling and automatic retry
- * Handles network errors and connection issues gracefully
- */
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        // Handle connection errors
-        if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-            console.error('Backend connection error:', error);
-            
-            // Retry once after 2 seconds
-            if (error.config && !error.config._retry) {
-                error.config._retry = true;
-                return new Promise((resolve) => {
-                    setTimeout(() => {
-                        resolve(api.request(error.config));
-                    }, 2000);
-                });
-            }
-        }
-        return Promise.reject(error);
-    }
-);
 
 // ============================================================================
 // Main Application Component
@@ -800,65 +744,37 @@ function App() {
 
     return (
         <>
-            {/* Backend Error Display */}
-        {backendError && (
-            <div style={{
-                position: 'fixed',
-                    top: '10px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                zIndex: 10000,
-                    background: 'rgba(255, 68, 68, 0.9)',
-                color: 'white',
-                    padding: '12px 20px',
-                    borderRadius: '8px',
-                fontSize: '0.9rem',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
-            }}>
-                <strong>Backend Error:</strong> {backendError}
-            </div>
-        )}
-        
-            {/* Main Application Container */}
-        <div className="app-container" style={{ 
-            display: isFullscreen ? 'none' : 'flex', 
-            height: '100vh', 
-            width: '100vw', 
-            backgroundColor: '#050510', 
-            color: 'white', 
-            overflow: 'hidden', 
-            boxSizing: 'border-box', 
-            margin: 0, 
-            padding: 0, 
-            position: 'fixed', 
-            top: 0, 
-            left: 0 
-        }}>
-            {/* Sidebar - Class Manager */}
+            {/* Bannière d'erreur backend (si le process Python est down) */}
+            {backendError && !datasetPath && (
+                <div className="toast-error">
+                    <strong>Backend :</strong> {backendError}
+                </div>
+            )}
+
+            {/* Shell principal (masqué en mode fullscreen canvas) */}
+            <div className="app-shell" style={{ display: isFullscreen ? 'none' : 'flex' }}>
+                {/* Panneau classes / outils YOLO */}
                 {!isFullscreen && currentLayout.showSidebar && (
                     <Sidebar
-                classes={classes}
-                setClasses={onUpdateClasses}
-                selectedClassId={selectedClassId}
-                setSelectedClassId={setSelectedClassId}
-                selectedAnnotationId={selectedAnnotationId}
-                onChangeAnnotationClass={onChangeAnnotationClass}
-                onImportYaml={handleImportYaml}
-                annotations={annotations}
-                onBatchDeleteClass={(classId) => {
-                    const newAnns = annotations.filter(a => a.class_id !== classId);
-                            saveAnnotations(newAnns);
-                }}
-                onBatchChangeClass={(oldClassId, newClassId) => {
-                    const newAnns = annotations.map(a => 
-                        a.class_id === oldClassId ? { ...a, class_id: newClassId } : a
-                    );
-                            saveAnnotations(newAnns);
+                        classes={classes}
+                        setClasses={onUpdateClasses}
+                        selectedClassId={selectedClassId}
+                        setSelectedClassId={setSelectedClassId}
+                        selectedAnnotationId={selectedAnnotationId}
+                        onChangeAnnotationClass={onChangeAnnotationClass}
+                        onImportYaml={handleImportYaml}
+                        annotations={annotations}
+                        onBatchDeleteClass={(classId) => {
+                            saveAnnotations(annotations.filter((a) => a.class_id !== classId));
                         }}
-                        onAlignAnnotations={() => {
-                            // TODO: Implement alignment
-                            alert('Alignment feature coming soon!');
+                        onBatchChangeClass={(oldClassId, newClassId) => {
+                            saveAnnotations(
+                                annotations.map((a) =>
+                                    a.class_id === oldClassId ? { ...a, class_id: newClassId } : a
+                                )
+                            );
                         }}
+                        onAlignAnnotations={() => alert('Alignment feature coming soon!')}
                         onPreAnnotate={async () => {
                             if (!yoloModelPath) {
                                 alert('Please set YOLO model path first');
@@ -866,340 +782,207 @@ function App() {
                             }
                             setLoading(true);
                             try {
-                                const currentImagePath = images[currentImageIndex];
                                 const res = await api.post('/pre_annotate', {
-                                    image_path: currentImagePath,
+                                    image_path: images[currentImageIndex],
                                     model_path: yoloModelPath,
                                     confidence: yoloConfidence,
-                                    dataset_path: datasetPath
+                                    dataset_path: datasetPath,
                                 });
-                                if (res.data.boxes) {
-                                    await saveAnnotations(res.data.boxes);
-                                }
-                    } catch (err) {
-                        console.error('Pre-annotation failed:', err);
-                        alert('Pre-annotation failed: ' + (err.message || 'Unknown error'));
+                                if (res.data.boxes) await saveAnnotations(res.data.boxes);
+                            } catch (err) {
+                                console.error('Pre-annotation failed:', err);
+                                alert('Pre-annotation failed: ' + (err.message || 'Unknown error'));
                             } finally {
-                        setLoading(false);
-                    }
-                }}
-                yoloModelPath={yoloModelPath}
-                setYoloModelPath={setYoloModelPath}
-                yoloConfidence={yoloConfidence}
-                setYoloConfidence={setYoloConfidence}
+                                setLoading(false);
+                            }
+                        }}
+                        yoloModelPath={yoloModelPath}
+                        setYoloModelPath={setYoloModelPath}
+                        yoloConfidence={yoloConfidence}
+                        setYoloConfidence={setYoloConfidence}
                         recentClasses={recentClasses}
-                quickDrawMode={quickDrawMode}
+                        quickDrawMode={quickDrawMode}
                         onToggleQuickDraw={() => setQuickDrawMode(!quickDrawMode)}
-                showMeasurements={showMeasurements}
+                        showMeasurements={showMeasurements}
                         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
-                annotationTemplates={annotationTemplates}
-                        onSaveTemplate={(template) => {
-                    setAnnotationTemplates(prev => [...prev, template]);
-                }}
-                onLoadTemplate={(template) => {
-                            // Apply template to current annotations
-                            alert('Template loading feature coming soon!');
-                }}
-                onDeleteTemplate={(templateId) => {
-                    setAnnotationTemplates(prev => prev.filter(t => t.id !== templateId));
-                }}
+                        annotationTemplates={annotationTemplates}
+                        onSaveTemplate={(template) => setAnnotationTemplates((prev) => [...prev, template])}
+                        onLoadTemplate={() => alert('Template loading feature coming soon!')}
+                        onDeleteTemplate={(templateId) =>
+                            setAnnotationTemplates((prev) => prev.filter((t) => t.id !== templateId))
+                        }
                         onOpenVisionLLM={() => setShowVisionLLM(true)}
                     />
-            )}
-
-            {/* Main Canvas Area */}
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                {/* Welcome Screen when no dataset is loaded */}
-                {!datasetPath && (
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '40px',
-                        textAlign: 'center',
-                        background: 'linear-gradient(135deg, rgba(0, 224, 255, 0.05) 0%, rgba(86, 176, 255, 0.05) 100%)'
-                    }}>
-                        <h1 className="neon-text" style={{ fontSize: '2.5rem', marginBottom: '20px', fontWeight: 'bold' }}>
-                            Lama Worlds Annotation Studio
-                        </h1>
-                        <p style={{ fontSize: '1.2rem', color: '#aaa', marginBottom: '40px', maxWidth: '600px' }}>
-                            Bienvenue ! Ouvrez un dataset pour commencer à annoter vos images.
-                        </p>
-                        <button
-                            className="btn-primary"
-                            onClick={handleOpenDataset}
-                            style={{
-                                padding: '15px 30px',
-                                fontSize: '1.1rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <FolderOpen size={24} />
-                            Ouvrir un Dataset
-                        </button>
-                        <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '30px' }}>
-                            Raccourci clavier : <kbd style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>Ctrl+O</kbd>
-                        </p>
-                    </div>
                 )}
-                
-                {/* Main Content when dataset is loaded */}
-                {datasetPath && (
-                    <>
-                    {/* Top Bar with Controls */}
-                    <div className="glass-panel title-drag-region" style={{ 
-                        minHeight: '60px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '0 20px', 
-                        justifyContent: 'space-between', 
-                        margin: '10px', 
-                        flexDirection: 'column', 
-                        zIndex: 1000, 
-                        position: 'relative', 
-                        boxSizing: 'border-box', 
-                        marginTop: '10px', 
-                        marginBottom: '10px' 
-                    }}>
-                        {/* Error Display */}
-                    {backendError && (
-                        <div style={{ 
-                            width: '100%', 
-                            background: 'rgba(255, 68, 68, 0.2)', 
-                            border: '1px solid #ff4444', 
-                            padding: '12px', 
-                            borderRadius: '4px', 
-                            marginBottom: '8px', 
-                            fontSize: '0.85rem', 
-                            color: '#ffaaaa',
-                            whiteSpace: 'pre-line',
-                            lineHeight: '1.5'
-                        }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '0.9rem' }}>
-                                ⚠️ Backend Error
-                            </div>
-                            <div style={{ marginBottom: '8px' }}>
-                                {backendError}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#ff8888', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 136, 136, 0.3)' }}>
-                                <strong>Quick Fix:</strong> Make sure Python 3.10+ is installed and dependencies are installed:<br/>
-                                <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px' }}>
-                                    pip install -r requirements.txt
-                                </code>
-                            </div>
+
+                {/* Zone centrale : welcome OU barre d'outils + canvas */}
+                <div className="app-main">
+                    {!datasetPath && (
+                        <div className="welcome">
+                            <h1 className="welcome-brand">
+                                Lama Worlds <em>Annotation Studio</em>
+                            </h1>
+                            <p className="welcome-sub">
+                                Ouvrez un dossier dataset (images + labels YOLO) pour commencer
+                                l&apos;annotation.
+                            </p>
+                            <button type="button" className="btn-primary btn-lg" onClick={handleOpenDataset}>
+                                <FolderOpen size={22} />
+                                Ouvrir un dataset
+                            </button>
+                            <p className="welcome-hint">
+                                Raccourci : <kbd>Ctrl</kbd> + <kbd>O</kbd>
+                            </p>
                         </div>
                     )}
-                        
-                        {/* Top Bar Controls */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                <div className="neon-text" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                    LAMA ANNOTATION STUDIO
-                                </div>
-                                
-                                {/* Open Dataset Button */}
-                                <button
-                                    onClick={async () => {
-                                        if (!window.electronAPI || !window.electronAPI.selectFolder) {
-                                            alert("Electron API not available. Please run in Electron.");
-                                            return;
-                                        }
-                                        const folderPath = await window.electronAPI.selectFolder();
-                                        if (folderPath) {
-                                            await loadDataset(folderPath);
-                                        }
-                                    }}
-                                    style={{
-                                        background: 'rgba(0, 224, 255, 0.15)',
-                                        border: '1px solid rgba(0, 224, 255, 0.4)',
-                                        borderRadius: '6px',
-                                        padding: '6px 12px',
-                                        color: '#00e0ff',
-                                        cursor: 'pointer',
-                                        fontSize: '0.85rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        fontWeight: '500',
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: '0 2px 8px rgba(0, 224, 255, 0.1)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = 'rgba(0, 224, 255, 0.25)';
-                                        e.target.style.boxShadow = '0 4px 12px rgba(0, 224, 255, 0.2)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = 'rgba(0, 224, 255, 0.15)';
-                                        e.target.style.boxShadow = '0 2px 8px rgba(0, 224, 255, 0.1)';
-                                    }}
-                                    title="Open Dataset Folder (Ctrl+O)"
-                                >
-                                    <FolderOpen size={16} />
-                                    Open Dataset
-                                </button>
-                                
-                                {/* Layout Manager */}
-                                <LayoutManager
-                                    currentLayout={currentLayout}
-                                    onLayoutChange={(layout) => {
-                                        setCurrentLayout(layout);
-                                        if (layout.showStatsPanels !== undefined) {
-                                            setShowStatsPanels(layout.showStatsPanels);
-                                        }
-                                    }}
-                                    showStatsPanels={showStatsPanels}
-                                    onToggleStatsPanels={() => setShowStatsPanels(!showStatsPanels)}
-                                    onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-                                />
-                                
-                                {/* Workflow Mode */}
-                                <WorkflowMode
-                                    currentMode={workflowMode}
-                                    onModeChange={setWorkflowMode}
-                                    onToggleQuickDraw={() => setQuickDrawMode(!quickDrawMode)}
-                                    onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
-                                />
-                                
-                                {/* Advanced Search */}
-                                <AdvancedSearch
-                                    onSearch={(filters) => {
-                                        setAdvancedFilters(filters);
-                                    }}
-                                    filters={advancedFilters}
-                                    imageTags={imageTags}
-                                    classes={classes}
-                                />
-                                
-                                {/* Theme Manager */}
-                                <ThemeManager
-                                    currentTheme={currentTheme}
-                                    onThemeChange={setCurrentTheme}
-                                />
-                                
-                                {/* Help Button */}
-                            <button
-                                onClick={() => setShowShortcuts(true)}
-                                style={{
-                                    background: 'rgba(0, 224, 255, 0.1)',
-                                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                                    borderRadius: '4px',
-                                    padding: '4px 8px',
-                                    color: '#00e0ff',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}
-                                title="Keyboard Shortcuts (?)"
-                            >
-                                <span>?</span> Help
-                            </button>
-                                
-                                {/* Settings Button */}
-                            <button
-                                onClick={() => setShowSettings(true)}
-                                style={{
-                                    background: 'rgba(0, 224, 255, 0.1)',
-                                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                                    borderRadius: '4px',
-                                    padding: '4px 8px',
-                                    color: '#00e0ff',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}
-                                title="Settings"
-                            >
-                                <Settings size={14} />
-                                Settings
-                            </button>
-                                
-                                {/* Save Status */}
-                                <div style={{ 
-                                    fontSize: '0.8rem', 
-                                    color: saveStatus === 'Error' ? '#ff4444' : '#00ff00', 
-                                    border: '1px solid rgba(255,255,255,0.1)', 
-                                    padding: '2px 8px', 
-                                    borderRadius: '4px' 
-                                }}>
-                                {saveStatus}
-                            </div>
-                                
-                                {/* Undo/Redo Controls */}
-                            <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#aaa', alignItems: 'center' }}>
-                                {(canUndo || canRedo) && (
-                                    <>
+
+                    {datasetPath && (
+                        <>
+                            {/* Barre d'outils supérieure */}
+                            <div className="glass-panel topbar title-drag-region">
+                                {backendError && (
+                                    <div className="inline-error">
+                                        <strong>Erreur backend</strong>
+                                        <div style={{ marginTop: 6 }}>{backendError}</div>
+                                        <div style={{ fontSize: '0.75rem', marginTop: 8, opacity: 0.85 }}>
+                                            Vérifiez Python 3.10+ puis :{' '}
+                                            <code>pip install -r requirements.txt</code>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="topbar-row">
+                                    <div className="topbar-left">
+                                        <div className="brand">
+                                            Lama <span>Studio</span>
+                                        </div>
+
                                         <button
-                                            onClick={handleUndo}
-                                            disabled={!canUndo}
-                                            style={{
-                                                    padding: '4px 8px',
-                                                background: canUndo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                                                borderRadius: '4px',
-                                                color: canUndo ? '#00e0ff' : '#666',
-                                                cursor: canUndo ? 'pointer' : 'not-allowed',
-                                                fontSize: '0.75rem'
+                                            type="button"
+                                            className="btn-secondary"
+                                            title="Ouvrir un dossier dataset (Ctrl+O)"
+                                            onClick={async () => {
+                                                if (!window.electronAPI?.selectFolder) {
+                                                    alert('Electron API not available. Please run in Electron.');
+                                                    return;
+                                                }
+                                                const folderPath = await window.electronAPI.selectFolder();
+                                                if (folderPath) await loadDataset(folderPath);
                                             }}
-                                                title="Undo (Ctrl+Z)"
                                         >
-                                                ↶ Undo
+                                            <FolderOpen size={15} />
+                                            Dataset
                                         </button>
-                                        <button
-                                            onClick={handleRedo}
-                                            disabled={!canRedo}
-                                            style={{
-                                                    padding: '4px 8px',
-                                                background: canRedo ? 'rgba(0, 224, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                                                    border: '1px solid rgba(0, 224, 255, 0.3)',
-                                                borderRadius: '4px',
-                                                color: canRedo ? '#00e0ff' : '#666',
-                                                cursor: canRedo ? 'pointer' : 'not-allowed',
-                                                fontSize: '0.75rem'
+
+                                        <LayoutManager
+                                            currentLayout={currentLayout}
+                                            onLayoutChange={(layout) => {
+                                                setCurrentLayout(layout);
+                                                if (layout.showStatsPanels !== undefined) {
+                                                    setShowStatsPanels(layout.showStatsPanels);
+                                                }
                                             }}
-                                                title="Redo (Ctrl+Y)"
-                                            >
-                                                ↷ Redo
+                                            showStatsPanels={showStatsPanels}
+                                            onToggleStatsPanels={() => setShowStatsPanels(!showStatsPanels)}
+                                            onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+                                        />
+
+                                        <WorkflowMode
+                                            currentMode={workflowMode}
+                                            onModeChange={setWorkflowMode}
+                                            onToggleQuickDraw={() => setQuickDrawMode(!quickDrawMode)}
+                                            onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
+                                        />
+
+                                        <AdvancedSearch
+                                            onSearch={setAdvancedFilters}
+                                            filters={advancedFilters}
+                                            imageTags={imageTags}
+                                            classes={classes}
+                                        />
+
+                                        <ThemeManager
+                                            currentTheme={currentTheme}
+                                            onThemeChange={setCurrentTheme}
+                                        />
+
+                                        <button
+                                            type="button"
+                                            className="btn-ghost"
+                                            onClick={() => setShowShortcuts(true)}
+                                            title="Raccourcis clavier (?)"
+                                        >
+                                            ? Aide
                                         </button>
-                                    </>
+
+                                        <button
+                                            type="button"
+                                            className="btn-ghost"
+                                            onClick={() => setShowSettings(true)}
+                                            title="Paramètres"
+                                        >
+                                            <Settings size={14} />
+                                            Réglages
+                                        </button>
+
+                                        <div
+                                            className={`save-badge${saveStatus === 'Error' ? ' is-error' : ''}`}
+                                        >
+                                            {saveStatus}
+                                        </div>
+
+                                        {(canUndo || canRedo) && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="btn-ghost"
+                                                    onClick={handleUndo}
+                                                    disabled={!canUndo}
+                                                    title="Annuler (Ctrl+Z)"
+                                                >
+                                                    ↶ Undo
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-ghost"
+                                                    onClick={handleRedo}
+                                                    disabled={!canRedo}
+                                                    title="Rétablir (Ctrl+Y)"
+                                                >
+                                                    ↷ Redo
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="topbar-right">
+                                        <div className="dataset-path" title={datasetPath}>
+                                            {datasetPath}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {images.length > 0 && (
+                                    <div className="progress-block">
+                                        <div className="progress-meta">
+                                            <span>
+                                                Image {currentImageIndex + 1} / {images.length}
+                                            </span>
+                                            <span>
+                                                {Math.round(((currentImageIndex + 1) / images.length) * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="progress-track">
+                                            <div
+                                                className="progress-fill"
+                                                style={{
+                                                    width: `${((currentImageIndex + 1) / images.length) * 100}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                            
-                            {/* Dataset Path Display */}
-                            {datasetPath && (
-                                <div style={{ fontSize: '0.75rem', color: '#666', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {datasetPath}
-                                </div>
-                            )}
-                        </div>
-                        
-                    {/* Progress Bar */}
-                    {datasetPath && images.length > 0 && (
-                        <div style={{ width: '100%', marginTop: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginBottom: '4px' }}>
-                                <span>Progress: {currentImageIndex + 1} / {images.length}</span>
-                                    <span>{Math.round(((currentImageIndex + 1) / images.length) * 100)}%</span>
-                            </div>
-                            <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ 
-                                    width: `${((currentImageIndex + 1) / images.length) * 100}%`, 
-                                    height: '100%', 
-                                    background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
-                                    transition: 'width 0.3s ease'
-                                }}></div>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
                     {/* Canvas Area */}
                     {currentImageIndex >= 0 && images[currentImageIndex] && (
@@ -1370,79 +1153,45 @@ function App() {
                     />
                 )}
                 
-                {/* Right Side Panels - Stats, Analytics, and Validation */}
+                {/* Colonnes stats / analytics / validation */}
                 {datasetPath && showStatsPanels && (
-                    <div style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        width: currentLayout.showStatsPanels ? '250px' : '40px',
-                        margin: '10px',
-                        gap: '10px',
-                        maxHeight: '100vh',
-                        overflowY: 'auto',
-                        transition: 'width 0.3s ease',
-                        position: 'relative'
-                    }}>
-                        {/* Toggle Button for Stats Panels */}
+                    <div className="stats-column">
                         <button
+                            type="button"
+                            className="btn-ghost"
                             onClick={() => setShowStatsPanels(!showStatsPanels)}
-                            style={{
-                                position: 'absolute',
-                                top: '0',
-                                right: showStatsPanels ? '0' : '-50px',
-                                zIndex: 100,
-                                padding: '6px 10px',
-                                background: 'rgba(0, 224, 255, 0.1)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
-                                borderRadius: '6px',
-                                color: '#00e0ff',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.3s ease',
-                                whiteSpace: 'nowrap'
-                            }}
-                            title={showStatsPanels ? 'Hide Statistics Panels' : 'Show Statistics Panels'}
+                            title={showStatsPanels ? 'Masquer les stats' : 'Afficher les stats'}
+                            style={{ alignSelf: 'flex-end' }}
                         >
                             {showStatsPanels ? <EyeOff size={14} /> : <Eye size={14} />}
-                            {showStatsPanels && <span>Hide Stats</span>}
+                            {showStatsPanels && <span>Masquer</span>}
                         </button>
-                        
+
                         {showStatsPanels && (
                             <>
-                                {/* Stats Panel */}
-                                <StatsPanel 
-                                    images={images} 
-                                    annotations={annotations} 
-                                    classes={classes} 
-                                    datasetPath={datasetPath} 
-                                    annotatedImages={annotatedImages} 
+                                <StatsPanel
+                                    images={images}
+                                    annotations={annotations}
+                                    classes={classes}
+                                    datasetPath={datasetPath}
+                                    annotatedImages={annotatedImages}
                                 />
-                                
-                                {/* Analytics Panel */}
                                 <AnalyticsPanel
                                     images={images}
                                     annotations={annotations}
                                     classes={classes}
                                     annotatedImages={annotatedImages}
                                 />
-                                
-                                {/* Validation Panel */}
                                 {currentImageIndex >= 0 && images[currentImageIndex] && (
                                     <ValidationPanel
                                         annotations={annotations}
                                         currentImagePath={images[currentImageIndex]}
                                         datasetPath={datasetPath}
                                         onFixAnnotation={(annId) => {
-                                            const newAnns = annotations.filter(a => a.id !== annId);
-                                            saveAnnotations(newAnns);
+                                            saveAnnotations(annotations.filter((a) => a.id !== annId));
                                         }}
                                     />
                                 )}
-                                
-                                {/* Measurements Panel */}
                                 {showMeasurements && (
                                     <MeasurementsPanel
                                         annotations={annotations}
@@ -1455,40 +1204,33 @@ function App() {
                             </>
                         )}
                     </div>
-            )}
-        </div>
-        
-        {/* Fullscreen Canvas */}
-        {isFullscreen && images.length > 0 && currentImageIndex >= 0 && currentImageIndex < images.length && images[currentImageIndex] && (
-            <div style={{ 
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 9999,
-                backgroundColor: '#000',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center'
-            }}>
-                <AnnotationCanvas
-                    imageUrl={images[currentImageIndex]}
-                    annotations={annotations}
-                    onChange={saveAnnotations}
-                    selectedClassId={selectedClassId}
-                    classes={classes}
-                    selectedId={selectedAnnotationId}
-                    onSelect={setSelectedAnnotationId}
-                    selectedIds={selectedAnnotationIds}
-                    onSelectMultiple={setSelectedAnnotationIds}
-                    showAnnotations={showAnnotations}
-                    onZoomToSelection={selectedAnnotationId || selectedAnnotationIds.size > 0}
-                    isFullscreen={isFullscreen}
-                    onToggleFullscreen={() => setIsFullscreen(prev => !prev)}
-                />
+                )}
             </div>
-        )}
+
+            {/* Canvas plein écran */}
+            {isFullscreen &&
+                images.length > 0 &&
+                currentImageIndex >= 0 &&
+                currentImageIndex < images.length &&
+                images[currentImageIndex] && (
+                    <div className="fullscreen-overlay">
+                        <AnnotationCanvas
+                            imageUrl={images[currentImageIndex]}
+                            annotations={annotations}
+                            onChange={saveAnnotations}
+                            selectedClassId={selectedClassId}
+                            classes={classes}
+                            selectedId={selectedAnnotationId}
+                            onSelect={setSelectedAnnotationId}
+                            selectedIds={selectedAnnotationIds}
+                            onSelectMultiple={setSelectedAnnotationIds}
+                            showAnnotations={showAnnotations}
+                            onZoomToSelection={selectedAnnotationId || selectedAnnotationIds.size > 0}
+                            isFullscreen={isFullscreen}
+                            onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
+                        />
+                    </div>
+                )}
         
             {/* Modals */}
             {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}

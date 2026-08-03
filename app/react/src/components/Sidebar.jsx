@@ -1,44 +1,5 @@
 /**
- * @fileoverview Sidebar Component - Class Management and Tools
- * 
- * This component provides the left sidebar with:
- * - Class list with color management
- * - YAML import/export
- * - YOLO pre-annotation tools
- * - Vision LLM integration
- * - Quick draw and measurements toggles
- * - Annotation templates
- * - Compact dropdown menus for better organization
- * 
- * @component
- * @param {Object} props - Component props
- * @param {Array<Object>} props.classes - Array of annotation classes
- * @param {Function} props.setClasses - Function to update classes
- * @param {number} props.selectedClassId - Currently selected class ID
- * @param {Function} props.setSelectedClassId - Function to set selected class
- * @param {string|null} props.selectedAnnotationId - Currently selected annotation ID
- * @param {Function} props.onChangeAnnotationClass - Function to change annotation class
- * @param {Function} props.onImportYaml - Function to import YAML classes
- * @param {Array<Object>} props.annotations - Current image annotations
- * @param {Function} props.onBatchDeleteClass - Function to batch delete by class
- * @param {Function} props.onBatchChangeClass - Function to batch change class
- * @param {Function} props.onAlignAnnotations - Function to align annotations
- * @param {Function} props.onPreAnnotate - Function to pre-annotate with YOLO
- * @param {string} props.yoloModelPath - Path to YOLO model
- * @param {Function} props.setYoloModelPath - Function to set YOLO model path
- * @param {number} props.yoloConfidence - YOLO confidence threshold
- * @param {Function} props.setYoloConfidence - Function to set confidence threshold
- * @param {Array<number>} props.recentClasses - Recently used class IDs
- * @param {boolean} props.quickDrawMode - Quick draw mode enabled
- * @param {Function} props.onToggleQuickDraw - Function to toggle quick draw
- * @param {boolean} props.showMeasurements - Show measurements enabled
- * @param {Function} props.onToggleMeasurements - Function to toggle measurements
- * @param {Array<Object>} props.annotationTemplates - Saved annotation templates
- * @param {Function} props.onSaveTemplate - Function to save template
- * @param {Function} props.onLoadTemplate - Function to load template
- * @param {Function} props.onDeleteTemplate - Function to delete template
- * @param {Function} props.onOpenVisionLLM - Function to open Vision LLM modal
- * @returns {JSX.Element} The rendered sidebar component
+ * Sidebar gauche — classes d'annotation, outils YOLO / Vision LLM, templates.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Upload, Download, Save, FolderOpen, Brain, Settings, Ruler, ChevronDown, ChevronUp, FileText, Zap, History, Search } from 'lucide-react';
@@ -131,7 +92,8 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
             return;
         }
         
-        const colors = ["#00e0ff", "#56b0ff", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a8e6cf", "#ff8b94", "#c7ceea"];
+        // Palette de couleurs pour les nouvelles classes (hex réels pour le canvas Konva)
+        const colors = ["#2dd4bf", "#38bdf8", "#f87171", "#34d399", "#fbbf24", "#a78bfa", "#fb7185", "#94a3b8"];
         let newId = 0;
         if (classes.length > 0) {
             const validIds = classes.filter(c => c && typeof c.id === 'number' && !isNaN(c.id)).map(c => c.id);
@@ -241,50 +203,26 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
     };
 
     return (
-        <div className="glass-panel" style={{ 
-            width: isCollapsed ? '60px' : '250px', 
-            margin: '10px', 
-            padding: isCollapsed ? '8px 15px' : '15px', 
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: 'all 0.3s ease',
-            overflow: isCollapsed ? 'hidden' : 'visible'
-        }}>
-            <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: isCollapsed ? 'center' : 'space-between',
-                marginBottom: isCollapsed ? 0 : '10px',
-                cursor: 'pointer',
-                userSelect: 'none'
-            }}
-            onClick={() => setIsCollapsed(!isCollapsed)}
+        <div className={`glass-panel side-panel${isCollapsed ? ' is-collapsed' : ''}`}>
+            {/* En-tête repliable */}
+            <div
+                className="panel-header"
+                style={{
+                    justifyContent: isCollapsed ? 'center' : 'space-between',
+                    marginBottom: isCollapsed ? 0 : 12,
+                    cursor: 'pointer',
+                }}
+                onClick={() => setIsCollapsed(!isCollapsed)}
             >
-                {!isCollapsed && <h3 className="neon-text" style={{ margin: 0 }}>Classes</h3>}
+                {!isCollapsed && <h3 className="panel-title">Classes</h3>}
                 <button
+                    type="button"
+                    className="btn-icon"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsCollapsed(!isCollapsed);
                     }}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#00e0ff',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '4px',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(0, 224, 255, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                    }}
-                    title={isCollapsed ? 'Expand panel' : 'Collapse panel'}
+                    title={isCollapsed ? 'Développer' : 'Réduire'}
                 >
                     {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </button>
@@ -292,24 +230,14 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
             {!isCollapsed && (
                 <>
-                {/* Search bar for classes */}
-                <div style={{ position: 'relative', marginBottom: '10px' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#666', zIndex: 1 }} />
+                {/* Filtre rapide sur le nom des classes */}
+                <div className="search-field">
+                    <Search size={14} className="search-icon" />
                     <input
                         type="text"
-                        placeholder="Search classes..."
+                        placeholder="Rechercher une classe…"
                         value={classSearchQuery}
                         onChange={(e) => setClassSearchQuery(e.target.value)}
-                        style={{ 
-                            width: '100%', 
-                            padding: '6px 8px 6px 30px', 
-                            background: 'rgba(255,255,255,0.1)', 
-                            border: '1px solid rgba(255,255,255,0.2)', 
-                            borderRadius: '4px', 
-                            color: 'white',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box'
-                        }}
                     />
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -322,18 +250,9 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                     <div
                         key={cls.id}
                         onClick={() => onClassClick(cls.id)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '8px',
-                            marginBottom: '5px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            background: selectedClassId === cls.id ? 'rgba(0, 224, 255, 0.2)' : 'transparent',
-                            border: selectedClassId === cls.id ? '1px solid var(--neon-blue)' : '1px solid transparent'
-                        }}
+                        className={`class-item${selectedClassId === cls.id ? ' is-selected' : ''}`}
                     >
-                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: cls.color, marginRight: '10px', boxShadow: `0 0 5px ${cls.color}` }}></div>
+                        <div className="class-swatch" style={{ background: cls.color }} />
 
                         {editingId === cls.id ? (
                             <input
@@ -350,7 +269,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
 
                         <div style={{ display: 'flex', gap: '5px' }}>
                             <Edit2 size={14} style={{ opacity: 0.5 }} onClick={(e) => { e.stopPropagation(); startEdit(cls); }} />
-                            <Trash2 size={14} style={{ opacity: 0.5, color: '#ff4444' }} onClick={(e) => { e.stopPropagation(); deleteClass(cls.id); }} />
+                            <Trash2 size={14} style={{ opacity: 0.5, color: 'var(--danger)' }} onClick={(e) => { e.stopPropagation(); deleteClass(cls.id); }} />
                         </div>
                     </div>
                 ))}
@@ -396,7 +315,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                             marginBottom: '4px',
                             background: 'rgba(20, 20, 35, 0.95)',
                             backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '8px',
                             padding: '6px',
                             zIndex: 1000,
@@ -490,7 +409,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                             marginBottom: '4px',
                             background: 'rgba(20, 20, 35, 0.95)',
                             backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '8px',
                             padding: '6px',
                             zIndex: 1000,
@@ -587,7 +506,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                                 marginBottom: '4px',
                                 background: 'rgba(20, 20, 35, 0.95)',
                                 backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(0, 224, 255, 0.3)',
+                                border: '1px solid rgba(45, 212, 191, 0.3)',
                                 borderRadius: '8px',
                                 padding: '6px',
                                 zIndex: 1000,
@@ -609,8 +528,8 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                                             alignItems: 'center',
                                             gap: '6px',
                                             justifyContent: 'space-between',
-                                            background: quickDrawMode ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                            border: quickDrawMode ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
+                                            background: quickDrawMode ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                            border: quickDrawMode ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
                                         }} 
                                         onClick={() => { onToggleQuickDraw(); setShowTogglesMenu(false); }}
                                         title="Quick Draw Mode (Q)"
@@ -632,8 +551,8 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                                             alignItems: 'center',
                                             gap: '6px',
                                             justifyContent: 'space-between',
-                                            background: showMeasurements ? 'rgba(0, 224, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                            border: showMeasurements ? '1px solid rgba(0, 224, 255, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
+                                            background: showMeasurements ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                            border: showMeasurements ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
                                         }} 
                                         onClick={() => { onToggleMeasurements(); setShowTogglesMenu(false); }}
                                         title="Show Measurements (M)"
@@ -670,7 +589,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                             marginBottom: '8px',
                             background: 'rgba(20, 20, 35, 0.95)',
                             backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             borderRadius: '8px',
                             padding: '12px',
                             zIndex: 1000,
@@ -800,7 +719,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                         position: 'relative'
                     }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                            <h3 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Brain size={20} />
                                 YOLO Pre-annotation
                             </h3>
@@ -843,7 +762,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                                         fontSize: '0.9rem',
                                         outline: 'none'
                                     }}
-                                    onFocus={(e) => e.target.style.borderColor = '#00e0ff'}
+                                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                                     onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'}
                                 />
                                 {window.electronAPI && window.electronAPI.selectFile && (
@@ -944,7 +863,7 @@ function Sidebar({ classes, setClasses, selectedClassId, setSelectedClassId, sel
                         overflowY: 'auto'
                     }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                            <h3 className="neon-text" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Settings size={20} />
                                 Custom Shortcuts
                             </h3>

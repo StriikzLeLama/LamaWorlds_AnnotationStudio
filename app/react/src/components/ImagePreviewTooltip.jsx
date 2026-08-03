@@ -36,14 +36,14 @@ function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], positi
             maxHeight: '400px',
             background: 'rgba(20, 20, 35, 0.95)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 224, 255, 0.3)',
+            border: '1px solid rgba(45, 212, 191, 0.3)',
             borderRadius: '12px',
             padding: '12px',
             zIndex: 100000,
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
             pointerEvents: 'none'
         }}>
-            <div style={{ marginBottom: '8px', fontSize: '0.85rem', color: '#00e0ff', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ marginBottom: '8px', fontSize: '0.85rem', color: 'var(--accent)', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {getName(imagePath)}
             </div>
             <img
@@ -60,7 +60,7 @@ function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], positi
             />
             {annotations.length > 0 && (
                 <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
-                    <div style={{ marginBottom: '4px', color: '#00e0ff' }}>Annotations: {annotations.length}</div>
+                    <div style={{ marginBottom: '4px', color: 'var(--accent)' }}>Annotations: {annotations.length}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                         {annotations.slice(0, 5).map((ann, idx) => {
                             const cls = Array.isArray(classes) ? classes.find(c => c && c.id === ann.class_id) : null;
@@ -70,7 +70,7 @@ function ImagePreviewTooltip({ imagePath, annotations = [], classes = [], positi
                                     style={{
                                         padding: '2px 6px',
                                         background: cls ? `${cls.color}33` : 'rgba(255, 255, 255, 0.1)',
-                                        border: `1px solid ${cls ? cls.color : '#00e0ff'}`,
+                                        border: `1px solid ${cls ? cls.color : 'var(--accent)'}`,
                                         borderRadius: '4px',
                                         fontSize: '0.7rem'
                                     }}

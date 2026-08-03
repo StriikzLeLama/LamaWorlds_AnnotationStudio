@@ -267,14 +267,14 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                 overflowY: 'auto',
                 background: 'rgba(20, 20, 35, 0.95)',
                 backdropFilter: 'blur(20px)',
-                border: '2px solid rgba(0, 224, 255, 0.3)',
-                boxShadow: '0 0 30px rgba(0, 224, 255, 0.2)'
+                border: '2px solid rgba(45, 212, 191, 0.3)',
+                boxShadow: '0 0 30px rgba(45, 212, 191, 0.2)'
             }} onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', borderBottom: '2px solid rgba(0, 224, 255, 0.2)', paddingBottom: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', borderBottom: '2px solid rgba(45, 212, 191, 0.2)', paddingBottom: '15px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Sparkles size={28} style={{ color: '#00e0ff' }} />
-                        <h2 className="neon-text" style={{ margin: 0, fontSize: '1.5rem' }}>Vision LLM Assistant</h2>
+                        <Sparkles size={28} style={{ color: 'var(--accent)' }} />
+                        <h2 className="panel-title" style={{ margin: 0, fontSize: '1.5rem' }}>Vision LLM Assistant</h2>
                     </div>
                     <button
                         onClick={onClose}
@@ -316,12 +316,12 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                         zIndex: 1000,
                         borderRadius: '8px'
                     }}>
-                        <Loader size={48} className="spin" style={{ color: '#00e0ff', marginBottom: '20px', animation: 'spin 1s linear infinite' }} />
-                        <div style={{ fontSize: '1.2rem', color: '#00e0ff', marginBottom: '10px', fontWeight: 'bold' }}>
+                        <Loader size={48} className="spin" style={{ color: 'var(--accent)', marginBottom: '20px', animation: 'spin 1s linear infinite' }} />
+                        <div style={{ fontSize: '1.2rem', color: 'var(--accent)', marginBottom: '10px', fontWeight: 'bold' }}>
                             Processing Images...
                         </div>
                         <div style={{ fontSize: '1rem', color: '#aaa', marginBottom: '15px' }}>
-                            <span style={{ color: '#00e0ff', fontWeight: 'bold' }}>{progress.current}</span> / {progress.total} images
+                            <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{progress.current}</span> / {progress.total} images
                             {progress.current > 0 && (
                                 <span style={{ marginLeft: '10px', color: '#56b0ff' }}>
                                     ({Math.round((progress.current / progress.total) * 100)}%)
@@ -332,9 +332,9 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                             <div style={{
                                 width: `${Math.min(progress.percentage, 100)}%`,
                                 height: '100%',
-                                background: 'linear-gradient(90deg, #00e0ff, #56b0ff)',
+                                background: 'linear-gradient(90deg, var(--accent), #56b0ff)',
                                 transition: 'width 0.3s ease',
-                                boxShadow: '0 0 10px rgba(0, 224, 255, 0.5)',
+                                boxShadow: '0 0 10px rgba(45, 212, 191, 0.5)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -355,10 +355,10 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                                     maxHeight: '200px', 
                                     margin: '0 auto',
                                     borderRadius: '8px', 
-                                    border: '2px solid #00e0ff',
+                                    border: '2px solid var(--accent)',
                                     overflow: 'hidden',
                                     background: 'rgba(0, 0, 0, 0.5)',
-                                    boxShadow: '0 0 20px rgba(0, 224, 255, 0.3)'
+                                    boxShadow: '0 0 20px rgba(45, 212, 191, 0.3)'
                                 }}>
                                     <img 
                                         src={progress.currentImage} 
@@ -387,7 +387,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                     {/* Left Column - Configuration */}
                     <div>
-                        <h3 style={{ color: '#00e0ff', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ color: 'var(--accent)', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Settings size={18} />
                             Configuration
                         </h3>
@@ -566,7 +566,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
 
                     {/* Right Column - Filters */}
                     <div>
-                        <h3 style={{ color: '#00e0ff', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ color: 'var(--accent)', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Filter size={18} />
                             Image Filters
                         </h3>
@@ -628,12 +628,12 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                         {/* Filter Summary */}
                         <div style={{ 
                             padding: '12px', 
-                            background: 'rgba(0, 224, 255, 0.1)', 
+                            background: 'rgba(45, 212, 191, 0.1)', 
                             borderRadius: '6px', 
-                            border: '1px solid rgba(0, 224, 255, 0.3)',
+                            border: '1px solid rgba(45, 212, 191, 0.3)',
                             marginBottom: '15px'
                         }}>
-                            <div style={{ fontSize: '0.85rem', color: '#00e0ff', marginBottom: '6px', fontWeight: 'bold' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--accent)', marginBottom: '6px', fontWeight: 'bold' }}>
                                 Filter Summary:
                             </div>
                             <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
@@ -652,11 +652,11 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                     <div style={{ 
                         marginTop: '20px', 
                         padding: '20px', 
-                        background: 'rgba(0, 224, 255, 0.1)', 
+                        background: 'rgba(45, 212, 191, 0.1)', 
                         borderRadius: '8px', 
-                        border: '1px solid rgba(0, 224, 255, 0.3)'
+                        border: '1px solid rgba(45, 212, 191, 0.3)'
                     }}>
-                        <h3 style={{ color: '#00e0ff', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ color: 'var(--accent)', marginBottom: '15px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <TrendingUp size={18} />
                             Results
                         </h3>
@@ -672,7 +672,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                             {results.verified_count !== undefined && (
                                 <div style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Verified</div>
-                                    <div style={{ fontSize: '1.5rem', color: '#00e0ff', fontWeight: 'bold' }}>
+                                    <div style={{ fontSize: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
                                         {results.verified_count} / {results.total_count || filteredImages.length}
                                     </div>
                                 </div>
@@ -680,7 +680,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                             {results.annotations_count !== undefined && (
                                 <div style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Annotations Created</div>
-                                    <div style={{ fontSize: '1.5rem', color: '#00e0ff', fontWeight: 'bold' }}>
+                                    <div style={{ fontSize: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
                                         {results.annotations_count}
                                     </div>
                                 </div>
@@ -688,7 +688,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                             {results.modifications_count !== undefined && (
                                 <div style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                                     <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>Modifications</div>
-                                    <div style={{ fontSize: '1.5rem', color: '#00e0ff', fontWeight: 'bold' }}>
+                                    <div style={{ fontSize: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
                                         {results.modifications_count}
                                     </div>
                                 </div>
@@ -698,7 +698,7 @@ function VisionLLMModal({ isOpen, onClose, images, annotations, classes, dataset
                         {/* Detailed Results - Show confidence breakdown for annotations */}
                         {mode === 'annotate' && results.annotations && results.annotations.length > 0 && (
                             <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                <h4 style={{ color: '#00e0ff', marginBottom: '10px', fontSize: '0.95rem' }}>Annotation Details</h4>
+                                <h4 style={{ color: 'var(--accent)', marginBottom: '10px', fontSize: '0.95rem' }}>Annotation Details</h4>
                                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                                     {results.annotations.map((annData, idx) => {
                                         if (!annData.annotations || annData.annotations.length === 0) return null;
